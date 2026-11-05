@@ -1,0 +1,45 @@
+{
+  "policies": {
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "DisableFeedbackCommands": true,
+    "DontCheckDefaultBrowser": true,
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": "",
+    "NoDefaultBookmarks": true,
+    "Homepage": {
+      "URL": "file:///usr/share/severian/start/index.html",
+      "StartPage": "homepage"
+    },
+    "FirefoxHome": {
+      "Search": true,
+      "TopSites": true,
+      "SponsoredTopSites": false,
+      "Highlights": false,
+      "Pocket": false,
+      "SponsoredPocket": false,
+      "Snippets": false,
+      "Locked": false
+    },
+    "UserMessaging": {
+      "ExtensionRecommendations": false,
+      "FeatureRecommendations": false,
+      "UrlbarInterventions": false,
+      "SkipOnboarding": true,
+      "MoreFromMozilla": false
+    },
+    "Preferences": {
+      "browser.newtabpage.activity-stream.showSponsored": { "Value": false, "Status": "default" },
+      "browser.newtabpage.activity-stream.showSponsoredTopSites": { "Value": false, "Status": "default" },
+      "browser.urlbar.suggest.quicksuggest.sponsored": { "Value": false, "Status": "default" },
+      "browser.urlbar.suggest.quicksuggest.nonsponsored": { "Value": false, "Status": "default" },
+      "browser.ml.chat.enabled": { "Value": false, "Status": "default" },
+      "browser.sessionstore.interval": { "Value": 60000, "Status": "default" },
+      "dom.ipc.processCount": { "Value": 4, "Status": "default" },
+      "layout.css.prefers-color-scheme.content-override": { "Value": 0, "Status": "default" },
+      "browser.theme.toolbar-theme": { "Value": 0, "Status": "default" },
+      "browser.aboutConfig.showWarning": { "Value": false, "Status": "default" }
+    }
+  }
+}

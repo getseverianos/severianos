@@ -1,0 +1,77 @@
+// SeverianOS · Waybar · Fuligin
+{
+  "layer": "top",
+  "position": "top",
+  "height": 24,
+  "spacing": 0,
+  "modules-left": ["custom/mark", "sway/workspaces", "sway/mode"],
+  "modules-center": ["clock"],
+  "modules-right": ["custom/updates", "cpu", "memory", "custom/temp", "network",
+                    "bluetooth", "sway/language", "pulseaudio", "battery"],
+
+  "custom/mark": {
+    "format": "●",
+    "tooltip": false,
+    "on-click": "fuzzel",
+    "on-click-right": "foot --app-id sevhelp -W 64x32 sh -c 'sevhelp; read -rsn1'"
+  },
+  "sway/workspaces": { "disable-scroll": true },
+  "sway/mode": { "format": "{}" },
+  "clock": {
+    "format": "{:%a %d %b  %H:%M}",
+    "tooltip-format": "<tt>{calendar}</tt>",
+    "calendar": {
+      "format": {
+        "today": "<span color='#b5523b'><b>{}</b></span>",
+        "weekdays": "<span color='#6f6a62'>{}</span>"
+      }
+    }
+  },
+  "custom/updates": {
+    "exec": "sevupdate --count",
+    "return-type": "json",
+    "interval": 3600,
+    "signal": 8,
+    "on-click": "foot --app-id sevupdate sevupdate --wait"
+  },
+  "cpu":    { "format": "cpu {usage}%", "interval": 3 },
+  "memory": { "format": "ram {percentage}%", "interval": 5,
+              "tooltip-format": "{used:0.1f} / {total:0.1f} GiB" },
+  "custom/temp": { "exec": "sevtemp 85", "return-type": "json", "interval": 5 },
+  "network": {
+    "format-wifi": "wlan {signalStrength}%",
+    "format-ethernet": "eth",
+    "format-disconnected": "offline",
+    "tooltip-format": "{ifname}  {ipaddr}",
+    "on-click": "foot --app-id sevnet -W 80x24 nmtui"
+  },
+  "bluetooth": {
+    "format": "bt",
+    "format-off": "bt –",
+    "format-disabled": "bt –",
+    "format-connected": "bt {num_connections}",
+    "format-no-controller": "",
+    "tooltip-format": "{controller_alias}",
+    "tooltip-format-connected": "{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}",
+    "on-click": "foot --app-id sevbt -W 90x26 bluetui"
+  },
+  "sway/language": {
+    "format": "{short}",
+    "tooltip-format": "{long}",
+    "on-click": "sevkeyboard"
+  },
+  "pulseaudio": {
+    "format": "vol {volume}%",
+    "format-muted": "vol –",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click-right": "pavucontrol",
+    "on-scroll-up": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 2%+",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 2%-"
+  },
+  "battery": {
+    "format": "bat {capacity}%",
+    "format-charging": "bat {capacity}%+",
+    "states": { "warning": 20, "critical": 10 }
+  }
+}

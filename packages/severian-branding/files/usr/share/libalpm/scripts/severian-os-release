@@ -1,0 +1,9 @@
+#!/bin/sh
+# Write the SeverianOS identity to /etc. Called by a pacman hook whenever
+# "filesystem" or "severian-branding" is installed or upgraded, so an
+# update of filesystem never turns the system back into plain Arch.
+set -e
+src=/usr/share/severian
+rm -f /etc/os-release
+cp "$src/os-release" /etc/os-release
+cp "$src/issue" /etc/issue

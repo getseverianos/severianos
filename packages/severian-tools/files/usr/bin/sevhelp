@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# sevhelp — the essential SeverianOS shortcuts
+
+e=$'\e[38;2;181;82;59m'; f=$'\e[38;2;216;210;198m'
+m=$'\e[38;2;111;106;98m'; b=$'\e[38;2;201;166;107m'; r=$'\e[0m'
+
+h() { printf '\n  %s%s%s\n' "$e" "$1" "$r"; }
+k() { printf '  %s%-24s%s %s%s\n' "$b" "$1" "$m" "$f$2" "$r"; }
+
+printf '\n  %s●%s %sseverian%s  %sshortcuts%s\n' "$e" "$r" "$f" "$r" "$m" "$r"
+
+h "start"
+k "super + enter"          "terminal"
+k "super + d"              "apps"
+k "super + shift + b"      "browser"
+k "super + shift + q"      "close window"
+k "super + escape"         "lock"
+k "super + shift + e"      "lock · log out · power"
+
+h "windows"
+k "super + h j k l"        "focus (arrows work too)"
+k "super + shift + h j k l" "move"
+k "super + f"              "fullscreen"
+k "super + shift + space"  "float"
+k "super + r"              "resize mode"
+
+h "layout"
+k "super + b / v"          "split horizontal / vertical"
+k "super + w / s / e"      "tabs / stack / split"
+
+h "workspaces"
+k "super + 1…9"            "switch"
+k "super + shift + 1…9"    "move window there"
+
+h "more"
+k "print"                  "region → clipboard"
+k "super + f2"             "keyboard layout"
+k "super + shift + c"      "reload config"
+k "click on the bar"       "eth/wlan: network · bt: bluetooth"
+k ""                       "vol: mute · right-click vol: mixer"
+
+h "commands"
+k "sevupdate"              "update the system"
+k "sevconfig"              "compare / restore your configs"
+k "sevfetch"               "system info"
+
+printf '\n  %spress any key to close%s\n' "$m" "$r"

@@ -1,0 +1,8 @@
+
+  ● SeverianOS · live medium · based on Arch Linux
+
+  desktop        starts on tty1
+  install        sudo sevinstall
+  network        nmtui
+  shortcuts      sevhelp
+

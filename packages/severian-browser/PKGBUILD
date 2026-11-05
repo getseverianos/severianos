@@ -1,0 +1,18 @@
+# Maintainer: SeverianOS <https://github.com/getseverianos>
+pkgname=severian-browser
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='sevbrowser – Firefox with SeverianOS policies: no telemetry, local start page'
+arch=('any')
+url='https://github.com/getseverianos'
+license=('GPL-3.0-or-later')
+depends=('firefox')
+backup=('etc/firefox/policies/policies.json')
+options=('!strip' '!debug')
+
+package() {
+    cp -dr --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+    find "$pkgdir" -type d -exec chmod 755 {} +
+    find "$pkgdir" -type f -exec chmod 644 {} +
+    chmod 755 "$pkgdir/usr/bin/sevbrowser"
+}

@@ -1,0 +1,16 @@
+# Maintainer: SeverianOS <https://github.com/getseverianos>
+pkgname=severian-config
+pkgver=0.1.0
+pkgrel=2
+pkgdesc='SeverianOS defaults: Sway, Waybar, foot, fuzzel, mako, GTK, zram, oomd, NetworkManager'
+arch=('any')
+url='https://github.com/getseverianos'
+license=('GPL-3.0-or-later')
+backup=('etc/iwd/main.conf')
+options=('!strip' '!debug')
+
+package() {
+    cp -dr --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+    find "$pkgdir" -type d -exec chmod 755 {} +
+    find "$pkgdir" -type f -exec chmod 644 {} +
+}

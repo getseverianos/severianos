@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# sevkeyboard — pick a keyboard layout. Applies it now and remembers it.
+
+lst=/usr/share/X11/xkb/rules/base.lst
+[[ -r $lst ]] || { echo "xkeyboard-config not found" >&2; exit 1; }
+
+choice=$(awk '/^! layout/{f=1; next} /^!/{f=0} f && NF {c=$1; $1=""; sub(/^ +/, ""); printf "%-6s %s\n", c, $0}' "$lst" \
+    | fuzzel --dmenu --prompt '● ' --width 44 --lines 12) || exit 0
+code=${choice%% *}
+[[ $code =~ ^[a-z_]+$ ]] || exit 0
+
+swaymsg "input type:keyboard xkb_layout $code" >/dev/null
+dir=${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d
+mkdir -p "$dir"
+printf '# set by sevkeyboard\ninput type:keyboard xkb_layout %s\n' "$code" > "$dir/keyboard.conf"
+notify-send -a SeverianOS "Keyboard" "Layout: $code" 2>/dev/null || true

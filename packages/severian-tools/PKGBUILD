@@ -1,0 +1,19 @@
+# Maintainer: SeverianOS <https://github.com/getseverianos>
+pkgname=severian-tools
+pkgver=0.1.0
+pkgrel=2
+pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp'
+arch=('any')
+url='https://github.com/getseverianos'
+license=('GPL-3.0-or-later')
+depends=('bash' 'coreutils' 'gawk' 'sed' 'diffutils' 'procps-ng' 'sudo'
+         'fuzzel' 'libnotify' 'pacman-contrib' 'fakeroot' 'xkeyboard-config')
+optdepends=('sway: severian-session, sevkeyboard, sevpower'
+            'swaylock: lock from sevpower')
+options=('!strip' '!debug')
+
+package() {
+    cp -dr --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+    find "$pkgdir" -type d -exec chmod 755 {} +
+    find "$pkgdir" -type f -exec chmod 755 {} +
+}

@@ -1,0 +1,14 @@
+#!/bin/sh
+# sevidle — idle handling for SeverianOS.
+# Installed system: lock after 10 min, screen off after 15 min, lock before sleep.
+# Live medium: the live user has no password, so never lock – only turn the screen off.
+
+if [ -d /run/archiso ]; then
+    exec swayidle -w \
+        timeout 900 'swaymsg "output * power off"' resume 'swaymsg "output * power on"'
+fi
+
+exec swayidle -w \
+    timeout 600 'swaylock -f' \
+    timeout 900 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+    before-sleep 'swaylock -f'

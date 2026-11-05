@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# sevconfig — compare your configs with the SeverianOS defaults, or restore them
+#   sevconfig status [--brief]   which configs differ from the defaults
+#   sevconfig diff APP           show the differences for one app
+#   sevconfig reset APP|all      restore the defaults (your version is backed up)
+
+skel=/etc/skel/.config
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}
+apps=(sway waybar foot fuzzel mako swaylock swaynag imv mpv gtk-3.0 gtk-4.0)
+
+e=$'\e[38;2;181;82;59m'; f=$'\e[38;2;216;210;198m'; m=$'\e[38;2;111;106;98m'
+b=$'\e[38;2;201;166;107m'; g=$'\e[38;2;127;154;101m'; r=$'\e[0m'
+
+state() { # default | changed | missing
+    if [[ ! -e $cfg/$1 ]]; then echo missing
+    elif diff -rq -x config.d "$skel/$1" "$cfg/$1" >/dev/null 2>&1; then echo default
+    else echo changed; fi
+}
+
+case ${1:-status} in
+status)
+    if [[ ${2:-} == --brief ]]; then
+        n=0; for a in "${apps[@]}"; do [[ $(state "$a") == changed ]] && n=$((n+1)); done
+        (( n > 0 )) && printf '\n  %s%s of your configs differ from the current defaults – see: sevconfig status%s\n' "$m" "$n" "$r"
+        exit 0
+    fi
+    printf '\n'
+    for a in "${apps[@]}"; do
+        s=$(state "$a")
+        case $s in
+            default) c=$g ;; changed) c=$b ;; *) c=$m ;;
+        esac
+        printf '  %s%-10s%s %s%s%s\n' "$f" "$a" "$r" "$c" "$s" "$r"
+    done
+    printf '\n  %s"changed" is fine – it only means you edited it. sevconfig diff APP shows how.%s\n\n' "$m" "$r"
+    ;;
+diff)
+    a=${2:?usage: sevconfig diff APP}
+    diff -ru --color=auto -x config.d "$skel/$a" "$cfg/$a"
+    ;;
+reset)
+    target=${2:?usage: sevconfig reset APP|all}
+    list=("$target"); [[ $target == all ]] && list=("${apps[@]}")
+    stamp=$(date +%Y%m%d-%H%M%S)
+    for a in "${list[@]}"; do
+        [[ -d $skel/$a ]] || { printf '  %sunknown app: %s%s\n' "$e" "$a" "$r"; continue; }
+        if [[ -e $cfg/$a ]]; then
+            mv "$cfg/$a" "$cfg/$a.bak-$stamp"
+            printf '  %sbacked up%s %s → %s.bak-%s\n' "$m" "$r" "$a" "$a" "$stamp"
+        fi
+        mkdir -p "$cfg"
+        cp -r "$skel/$a" "$cfg/$a"
+        # keep personal sway drop-ins such as keyboard.conf
+        if [[ $a == sway && -d $cfg/sway.bak-$stamp/config.d ]]; then
+            cp -rn "$cfg/sway.bak-$stamp/config.d/." "$cfg/sway/config.d/"
+        fi
+        printf '  %s✓%s %s restored\n' "$g" "$r" "$a"
+    done
+    [[ -n ${SWAYSOCK:-} ]] && swaymsg reload >/dev/null 2>&1
+    ;;
+*)
+    sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'
+    exit 1
+    ;;
+esac

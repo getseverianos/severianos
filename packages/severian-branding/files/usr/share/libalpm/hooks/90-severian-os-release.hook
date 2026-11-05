@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+Target = severian-branding
+
+[Action]
+Description = Setting the SeverianOS identity...
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/severian-os-release

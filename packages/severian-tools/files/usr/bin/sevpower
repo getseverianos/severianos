@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# sevpower — lock, log out, reboot or power off via fuzzel
+
+choice=$(printf 'lock\nlog out\nreboot\npower off\n' \
+    | fuzzel --dmenu --prompt '● ' --lines 4 --width 16) || exit 0
+
+case $choice in
+    lock)        swaylock -f ;;
+    'log out')   swaymsg exit ;;
+    reboot)      systemctl reboot ;;
+    'power off') systemctl poweroff ;;
+esac

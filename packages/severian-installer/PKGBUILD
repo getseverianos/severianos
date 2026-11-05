@@ -1,0 +1,21 @@
+# Maintainer: SeverianOS <https://github.com/getseverianos>
+pkgname=severian-installer
+pkgver=0.1.0
+pkgrel=2
+pkgdesc='sevinstall – the SeverianOS installer (live medium only)'
+arch=('any')
+url='https://github.com/getseverianos'
+license=('GPL-3.0-or-later')
+depends=('bash' 'arch-install-scripts' 'gptfdisk' 'dosfstools' 'e2fsprogs' 'btrfs-progs'
+         'cryptsetup' 'util-linux' 'psmisc' 'curl' 'reflector' 'xkeyboard-config' 'kbd')
+options=('!strip' '!debug')
+
+package() {
+    cp -dr --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+    find "$pkgdir" -type d -exec chmod 755 {} +
+    find "$pkgdir" -type f -exec chmod 644 {} +
+    chmod 755 "$pkgdir/usr/bin/sevinstall"
+    # Public repo URL, filled in by build.sh from config.sh (empty = not published yet)
+    install -d "$pkgdir/usr/share/severian"
+    printf 'REPO_URL=%q\n' "${SEVERIAN_REPO_URL:-}" > "$pkgdir/usr/share/severian/installer.conf"
+}

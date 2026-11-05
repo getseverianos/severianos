@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# sevwelcome — greet the user once (on the live medium: every session)
+
+state=${XDG_STATE_HOME:-$HOME/.local/state}/severian
+live=0; [[ -d /run/archiso ]] && live=1
+
+[[ -e $state/welcomed && $live -eq 0 ]] && exit 0
+mkdir -p "$state" && touch "$state/welcomed"
+
+sleep 2
+body=$'super + enter   terminal\nsuper + d       apps\nsuper + f1      all shortcuts'
+(( live )) && body+=$'\n\nto install: super + d → Install SeverianOS'
+notify-send -a SeverianOS "Welcome to SeverianOS" "$body"

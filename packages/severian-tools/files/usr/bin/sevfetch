@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# sevfetch — system info, SeverianOS style. Plain bash + coreutils.
+
+e=$'\e[38;2;181;82;59m'   # ember
+f=$'\e[38;2;216;210;198m' # text
+m=$'\e[38;2;111;106;98m'  # muted
+r=$'\e[0m'
+
+# shellcheck disable=SC1091
+. /etc/os-release 2>/dev/null
+os=${PRETTY_NAME:-Linux}
+kernel=$(uname -r)
+up=$(uptime -p 2>/dev/null | sed 's/^up //')
+pkgs=$(pacman -Qq 2>/dev/null | wc -l)
+shell=${SHELL##*/}
+wm=; [[ -n ${SWAYSOCK:-} ]] && wm=sway
+cpu=$(sed -n 's/^model name\s*: //p' /proc/cpuinfo | head -1 \
+      | sed 's/(R)//g; s/(TM)//g; s/(tm)//g; s/ CPU//; s/ with .*//; s/ [0-9]*-Core Processor//; s/  */ /g')
+gpu=
+for d in /sys/class/drm/card[0-9]/device; do
+    [[ -r $d/uevent ]] || continue
+    drv=$(sed -n 's/^DRIVER=//p' "$d/uevent")
+    [[ -n $drv && $gpu != *"$drv"* ]] && gpu+="${gpu:+, }$drv"
+done
+read -r mt ma < <(awk '/MemTotal/{t=$2}/MemAvailable/{a=$2}END{print t,a}' /proc/meminfo)
+mem="$(( (mt-ma)/1024 )) / $(( mt/1024 )) MiB"
+host=$(cat /etc/hostname 2>/dev/null || uname -n)
+
+logo=(
+"${f}     ▄▄▀▀▀▀▄▄     "
+"${f}   ▄▀        ▀▄   "
+"${f}  █     ${e}▄▄${f}     █  "
+"${f}  █    ${e}████${f}    █  "
+"${f}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀"
+)
+info=(
+"${e}${USER:-$(id -un)}${m}@${f}${host}"
+"${m}os       ${f}${os}"
+"${m}kernel   ${f}${kernel}"
+"${m}uptime   ${f}${up}"
+"${m}packages ${f}${pkgs}"
+"${m}shell    ${f}${shell}${wm:+${m}  wm ${f}${wm}}"
+"${m}cpu      ${f}${cpu}"
+"${m}gpu      ${f}${gpu:-–}"
+"${m}memory   ${f}${mem}"
+)
+
+echo
+n=$(( ${#info[@]} > ${#logo[@]} ? ${#info[@]} : ${#logo[@]} ))
+for ((i=0; i<n; i++)); do
+    l=${logo[i]:-"                  "}
+    printf '  %s%s   %s%s\n' "$l" "$r" "${info[i]:-}" "$r"
+done
+echo

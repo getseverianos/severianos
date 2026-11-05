@@ -1,0 +1,34 @@
+# Maintainer: SeverianOS <https://github.com/getseverianos>
+# Meta package: installing this turns a base system into SeverianOS.
+pkgname=severian-desktop
+pkgver=0.1.0
+pkgrel=2
+pkgdesc='SeverianOS desktop: Sway with everything needed for daily use'
+arch=('any')
+url='https://github.com/getseverianos'
+license=('GPL-3.0-or-later')
+depends=(
+    # SeverianOS
+    'severian-branding' 'severian-config' 'severian-tools' 'severian-browser'
+    # Desktop
+    'sway' 'swaybg' 'swayidle' 'swaylock' 'xorg-xwayland' 'xdg-desktop-portal-wlr' 'polkit' 'polkit-gnome'
+    'waybar' 'foot' 'fuzzel' 'mako' 'grim' 'slurp' 'wl-clipboard' 'brightnessctl'
+    # Apps
+    'thunar' 'gvfs' 'mpv' 'imv' 'pavucontrol' 'xdg-user-dirs'
+    # Audio
+    'pipewire' 'pipewire-pulse' 'pipewire-alsa' 'wireplumber'
+    # Graphics (AMD + Intel via Mesa)
+    'mesa' 'vulkan-radeon' 'vulkan-intel' 'intel-media-driver'
+    # Network & Bluetooth
+    'networkmanager' 'iwd' 'bluez' 'bluez-utils' 'bluetui'
+    # Login
+    'greetd' 'greetd-tuigreet'
+    # System
+    'zram-generator' 'pacman-contrib' 'power-profiles-daemon'
+    # Look
+    'ttf-jetbrains-mono' 'noto-fonts' 'ttf-dejavu' 'adwaita-icon-theme'
+)
+
+package() {
+    :
+}

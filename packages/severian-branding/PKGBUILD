@@ -1,0 +1,16 @@
+# Maintainer: SeverianOS <https://github.com/getseverianos>
+pkgname=severian-branding
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='SeverianOS identity: os-release, logo, wallpaper'
+arch=('any')
+url='https://github.com/getseverianos'
+license=('GPL-3.0-or-later' 'CC-BY-SA-4.0')
+options=('!strip' '!debug')
+
+package() {
+    cp -dr --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+    find "$pkgdir" -type d -exec chmod 755 {} +
+    find "$pkgdir" -type f -exec chmod 644 {} +
+    chmod 755 "$pkgdir/usr/share/libalpm/scripts/severian-os-release"
+}

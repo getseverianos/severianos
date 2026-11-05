@@ -1,0 +1,18 @@
+# SeverianOS · swaynag · Fuligin
+font=JetBrains Mono 10
+
+[warning]
+background=121214
+border=b5523b
+border-bottom=b5523b
+button-background=1c1b1f
+text=d8d2c6
+button-text=e6e1d8
+
+[error]
+background=121214
+border=b5523b
+border-bottom=b5523b
+button-background=1c1b1f
+text=d8d2c6
+button-text=e6e1d8

@@ -1,0 +1,51 @@
+/* SeverianOS · Waybar · Fuligin */
+* {
+  font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
+  font-size: 12px;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+}
+window#waybar {
+  background: #121214;
+  color: #d8d2c6;
+  border-bottom: 1px solid #1f1e22;
+}
+tooltip {
+  background: #121214;
+  border: 1px solid #b5523b;
+}
+tooltip label { color: #d8d2c6; }
+
+#custom-mark {
+  padding: 0 10px 0 12px;
+  color: #b5523b;
+}
+#custom-mark:hover { color: #c9a66b; }
+
+#workspaces button {
+  padding: 0 8px;
+  color: #6f6a62;
+  background: transparent;
+}
+#workspaces button:hover { color: #d8d2c6; background: #1c1b1f; }
+#workspaces button.focused {
+  color: #e6e1d8;
+  box-shadow: inset 0 -2px #b5523b;
+}
+#workspaces button.urgent { color: #c9a66b; }
+#mode { padding: 0 10px; color: #121214; background: #b5523b; }
+
+#clock { color: #e6e1d8; }
+#custom-updates, #cpu, #memory, #custom-temp, #network, #bluetooth, #language,
+#pulseaudio, #battery, #clock {
+  padding: 0 10px;
+}
+#battery { padding-right: 14px; }
+#custom-updates { color: #c9a66b; }
+#language { color: #8a857c; }
+#custom-temp.critical, #battery.critical { color: #b5523b; }
+#battery.warning { color: #c9a66b; }
+#battery.charging { color: #7f9a65; }
+#pulseaudio.muted, #network.disconnected, #bluetooth.off, #bluetooth.disabled { color: #6f6a62; }
+#bluetooth.connected { color: #d8d2c6; }

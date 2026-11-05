@@ -1,0 +1,29 @@
+# SeverianOS · shell defaults
+# Sourced from ~/.bashrc. To opt out, remove the line that sources this file.
+
+alias ls='ls --color=auto --group-directories-first'
+alias ll='ls -lh'
+alias la='ls -lAh'
+alias grep='grep --color=auto'
+alias ip='ip -color=auto'
+
+HISTSIZE=5000
+HISTCONTROL=ignoreboth
+shopt -s histappend checkwinsize
+
+# Prompt: ● ~/path   (the ember turns brass when the last command failed)
+__sev_prompt() {
+    local s=$?
+    local ember='\[\e[38;2;181;82;59m\]' brass='\[\e[38;2;201;166;107m\]'
+    local muted='\[\e[38;2;111;106;98m\]' reset='\[\e[0m\]'
+    local dot="${ember}●"
+    [[ $s -ne 0 ]] && dot="${brass}●"
+    PS1="${dot}${reset} ${muted}\w${reset} "
+}
+PROMPT_COMMAND=__sev_prompt
+
+# Show sevfetch once, in the first terminal of a session
+if [[ -n $WAYLAND_DISPLAY && ! -e ${XDG_RUNTIME_DIR:-/tmp}/.sevfetch ]] && command -v sevfetch >/dev/null; then
+    touch "${XDG_RUNTIME_DIR:-/tmp}/.sevfetch"
+    sevfetch
+fi

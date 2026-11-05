@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SeverianOS</title>
+<style>
+  :root {
+    --bg: #121214; --surface: #1c1b1f; --line: #2a292e; --muted: #6f6a62;
+    --text: #d8d2c6; --bright: #e6e1d8; --ember: #b5523b; --brass: #c9a66b;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2.2rem;
+  }
+  .mark { width: 72px; height: 72px; opacity: .9; }
+  .time { font-size: 3.4rem; color: var(--bright); letter-spacing: .04em; }
+  .date { color: var(--muted); text-align: center; margin-top: .4rem; font-size: .9rem; }
+  form { width: min(560px, 86vw); }
+  input {
+    width: 100%; padding: .85rem 1rem; font: inherit; font-size: 1rem;
+    background: var(--surface); color: var(--bright);
+    border: 1px solid var(--line); border-radius: 0; outline: none;
+  }
+  input::placeholder { color: var(--muted); }
+  input:focus { border-color: var(--ember); }
+  .keys {
+    display: grid; grid-template-columns: auto auto; gap: .35rem 1.4rem;
+    font-size: .8rem; color: var(--muted);
+  }
+  .keys b { color: var(--brass); font-weight: normal; text-align: right; }
+  .foot { position: fixed; bottom: 1.2rem; font-size: .72rem; color: #46444a; letter-spacing: .3em; }
+</style>
+</head>
+<body>
+  <img class="mark" src="mark.svg" alt="">
+  <div>
+    <div class="time" id="time">--:--</div>
+    <div class="date" id="date"></div>
+  </div>
+  <form action="https://duckduckgo.com/" method="get" autocomplete="off">
+    <input name="q" placeholder="search the web" autofocus>
+  </form>
+  <div class="keys">
+    <b>super + enter</b><span>terminal</span>
+    <b>super + d</b><span>apps</span>
+    <b>super + f1</b><span>all shortcuts</span>
+    <b>ctrl + l</b><span>address bar</span>
+  </div>
+  <div class="foot">severian</div>
+<script>
+  // Local only: no requests, no storage, no tracking.
+  const pad = n => String(n).padStart(2, "0");
+  function tick() {
+    const d = new Date();
+    document.getElementById("time").textContent = pad(d.getHours()) + ":" + pad(d.getMinutes());
+    document.getElementById("date").textContent =
+      d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }).toLowerCase();
+  }
+  tick(); setInterval(tick, 10000);
+</script>
+</body>
+</html>

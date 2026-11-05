@@ -1,0 +1,29 @@
+# SeverianOS · swaylock · Fuligin
+image=/usr/share/backgrounds/severian/fuligin.png
+scaling=fill
+color=121214
+font=JetBrains Mono
+indicator-radius=64
+indicator-thickness=4
+show-failed-attempts
+ignore-empty-password
+
+inside-color=12121400
+inside-clear-color=12121400
+inside-ver-color=12121400
+inside-wrong-color=12121400
+ring-color=2a292e
+ring-clear-color=6f6a62
+ring-ver-color=c9a66b
+ring-wrong-color=b5523b
+key-hl-color=b5523b
+bs-hl-color=6f6a62
+line-color=00000000
+line-clear-color=00000000
+line-ver-color=00000000
+line-wrong-color=00000000
+separator-color=00000000
+text-color=d8d2c6
+text-clear-color=6f6a62
+text-ver-color=c9a66b
+text-wrong-color=b5523b

@@ -1,0 +1,7 @@
+#!/bin/sh
+# sevbrowser — the SeverianOS web browser.
+# Firefox, with SeverianOS policies (/etc/firefox/policies/policies.json):
+# no telemetry, no studies, no Pocket, no sponsored content, a local start
+# page and lean defaults for older hardware. Check them at about:policies.
+export MOZ_ENABLE_WAYLAND=1
+exec firefox "$@"

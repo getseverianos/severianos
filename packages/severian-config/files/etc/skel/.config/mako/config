@@ -1,0 +1,21 @@
+# SeverianOS · mako · Fuligin
+font=JetBrains Mono 10
+background-color=#121214
+text-color=#d8d2c6
+border-color=#b5523b
+border-size=2
+padding=12
+margin=10
+width=340
+default-timeout=6000
+format=<b>%s</b>\n%b
+
+[urgency=low]
+border-color=#46444a
+
+[urgency=critical]
+border-color=#c9a66b
+default-timeout=0
+
+[app-name=SeverianOS]
+default-timeout=12000

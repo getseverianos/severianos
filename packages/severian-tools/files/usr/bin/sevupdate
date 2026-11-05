@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# sevupdate — update SeverianOS
+#   sevupdate           update everything (pacman -Syu)
+#   sevupdate --count   print pending updates as Waybar JSON
+#   sevupdate --wait    update, then wait for a key (used by the bar)
+
+if [[ ${1:-} == --count ]]; then
+    n=$(checkupdates 2>/dev/null | wc -l)
+    if (( n > 0 )); then
+        printf '{"text":"upd %s","tooltip":"%s updates available – click to install","class":"pending"}\n' "$n" "$n"
+    else
+        printf '{"text":""}\n'
+    fi
+    exit 0
+fi
+
+wait=0
+[[ ${1:-} == --wait ]] && { wait=1; shift; }
+
+e=$'\e[38;2;181;82;59m'; m=$'\e[38;2;111;106;98m'; r=$'\e[0m'
+printf '\n  %s●%s updating SeverianOS\n\n' "$e" "$r"
+
+status=0
+sudo pacman -Syu "$@" || status=$?
+
+if (( status == 0 )); then
+    pkill -RTMIN+8 waybar 2>/dev/null || true
+    command -v sevconfig >/dev/null && sevconfig status --brief
+    [[ -e /usr/lib/modules/$(uname -r) ]] || printf '\n  %sa new kernel was installed – reboot when convenient%s\n' "$m" "$r"
+fi
+
+if (( wait )); then
+    printf '\n  %spress any key to close%s\n' "$m" "$r"
+    read -rsn1
+fi
+exit "$status"

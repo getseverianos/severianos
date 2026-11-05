@@ -1,0 +1,444 @@
+#!/usr/bin/env bash
+# sevinstall — install SeverianOS to a disk.
+#
+#   sudo sevinstall             interactive install
+#   sevinstall --dry-run        ask everything, show the plan, change nothing
+#
+# Layout:  UEFI → GPT: 1 GiB EFI (/boot, systemd-boot) + root
+#          BIOS → GPT: 1 MiB BIOS boot + root (GRUB)
+#          root: ext4 or btrfs (@ @home @log @pkg), optional LUKS2 (UEFI only)
+set -Eeuo pipefail
+
+VERSION=0.1.1
+TARGET=/mnt
+LOG=/var/log/sevinstall.log
+CONF=/usr/share/severian/installer.conf
+DRY=0
+[[ ${1:-} == --dry-run ]] && DRY=1
+REPO_URL=
+# answers, filled in by ask/ask_secret via printf -v
+n='' m='' confirm='' FS='' HOST='' TIMEZONE='' loc='' KB='' USERNAME='' USER_PW='' LUKS_PW=''
+# shellcheck disable=SC1090
+[[ -r $CONF ]] && . "$CONF"
+
+# Console in Fuligin colours (same as the live medium and the installed system)
+VT='vt.default_red=18,181,127,201,107,154,111,216,70,208,153,221,132,179,136,236 vt.default_grn=18,82,154,166,130,122,154,210,68,106,180,189,155,147,179,231 vt.default_blu=20,59,101,107,153,160,150,198,74,80,125,133,178,185,174,221'
+
+E=$'\e[38;2;181;82;59m'; B=$'\e[38;2;201;166;107m'; F=$'\e[38;2;216;210;198m'
+M=$'\e[38;2;111;106;98m'; G=$'\e[38;2;127;154;101m'; R=$'\e[0m'
+
+# ── ui ─────────────────────────────────────────────────────────────
+section() { printf '\n%s●%s %s%s%s\n' "$E" "$R" "$F" "$*" "$R"; }
+note()    { printf '  %s%s%s\n' "$M" "$*" "$R"; }
+ok()      { printf '  %s✓%s %s\n' "$G" "$R" "$*"; }
+fail()    { printf '\n  %s✗ %s%s\n\n' "$E" "$*" "$R" >&2; exit 1; }
+row()     { printf '  %s%-12s%s %s\n' "$M" "$1" "$R" "$2"; }
+
+ask() { # ask VAR "question" [default]
+    local __v __d=${3:-}
+    if [[ -n $__d ]]; then
+        printf '  %s%s%s %s[%s]%s: ' "$F" "$2" "$R" "$M" "$__d" "$R"
+    else
+        printf '  %s%s%s: ' "$F" "$2" "$R"
+    fi
+    IFS= read -r __v || fail "input closed"
+    printf -v "$1" '%s' "${__v:-$__d}"
+}
+
+ask_secret() { # ask_secret VAR "question"
+    local __a __b
+    while :; do
+        printf '  %s%s%s: ' "$F" "$2" "$R"; IFS= read -rs __a || fail "input closed"; echo
+        printf '  %s%s (again)%s: ' "$F" "$2" "$R"; IFS= read -rs __b || fail "input closed"; echo
+        [[ -n $__a ]] || { note "must not be empty"; continue; }
+        [[ $__a == "$__b" ]] || { note "did not match – try again"; continue; }
+        break
+    done
+    printf -v "$1" '%s' "$__a"
+}
+
+yesno() { # yesno "question" y|n
+    local __a __d=${2:-n} __h='y/N'
+    [[ $__d == y ]] && __h='Y/n'
+    printf '  %s%s%s %s[%s]%s: ' "$F" "$1" "$R" "$M" "$__h" "$R"
+    IFS= read -r __a || fail "input closed"
+    [[ ${__a:-$__d} =~ ^[Yy] ]]
+}
+
+part() { # part /dev/sda 1 → /dev/sda1 ; part /dev/nvme0n1 1 → /dev/nvme0n1p1
+    if [[ $1 =~ [0-9]$ ]]; then printf '%sp%s' "$1" "$2"; else printf '%s%s' "$1" "$2"; fi
+}
+
+ch() { arch-chroot "$TARGET" "$@"; }
+
+console_keymap() { # xkb layout → console keymap
+    case $1 in
+        de) echo de-latin1 ;;
+        fr) echo fr-latin1 ;;
+        gb) echo uk ;;
+        ch) echo de_CH-latin1 ;;
+        *)  if find /usr/share/kbd/keymaps -name "$1.map.gz" -print -quit 2>/dev/null | grep -q .; then
+                echo "$1"
+            else
+                echo us
+            fi ;;
+    esac
+}
+
+# ── start ──────────────────────────────────────────────────────────
+if (( EUID != 0 && ! DRY )); then
+    exec sudo "$0" "$@"
+fi
+
+clear 2>/dev/null || true
+printf '\n  %s●%s %sSeverianOS installer%s %s%s%s\n' "$E" "$R" "$F" "$R" "$M" "$VERSION" "$R"
+(( DRY )) && note "dry run – nothing will be changed"
+note "Ctrl+C cancels at any point before the final confirmation."
+
+if [[ -d /sys/firmware/efi/efivars ]]; then BOOT=uefi; else BOOT=bios; fi
+
+# ── network ────────────────────────────────────────────────────────
+section "Network"
+online() { curl -fsI --max-time 6 https://archlinux.org >/dev/null 2>&1; }
+if online; then
+    ok "online"
+else
+    note "No internet connection. The installer downloads packages, so it needs one."
+    if yesno "Open network settings (nmtui) now?" y; then nmtui || true; fi
+    if online; then
+        ok "online"
+    elif (( DRY )); then
+        note "still offline (ignored in dry run)"
+    else
+        fail "still offline – connect and run sevinstall again"
+    fi
+fi
+
+# ── disk ───────────────────────────────────────────────────────────
+section "Disk"
+live_disk=
+src=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null || true)
+if [[ -n $src ]]; then live_disk=/dev/$(lsblk -no PKNAME "$src" 2>/dev/null | head -1); fi
+
+disks=()
+while read -r name type ro; do
+    [[ $type == disk && $ro == 0 ]] || continue
+    [[ $name == /dev/zram* || $name == /dev/loop* ]] && continue
+    [[ -n $live_disk && $name == "$live_disk" ]] && continue
+    disks+=("$name")
+done < <(lsblk -dpno NAME,TYPE,RO)
+(( ${#disks[@]} )) || fail "no suitable disk found"
+
+for i in "${!disks[@]}"; do
+    d=${disks[i]}
+    printf '  %s%d%s  %-14s %8s  %s\n' "$B" "$((i+1))" "$R" "$d" \
+        "$(lsblk -dno SIZE "$d" | tr -d ' ')" "$(lsblk -dno MODEL "$d" | sed 's/ *$//')"
+done
+while :; do
+    ask n "Install to disk number" "1"
+    [[ $n =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#disks[@]} )) && break
+    note "pick a number from the list"
+done
+DISK=${disks[n-1]}
+size=$(lsblk -bdno SIZE "$DISK")
+(( size >= 12 * 1024**3 )) || fail "$DISK is smaller than 12 GiB"
+
+if lsblk -no MOUNTPOINTS "$DISK" | grep -q .; then
+    note "$DISK has mounted partitions – they will be unmounted."
+fi
+
+# ── filesystem & encryption ────────────────────────────────────────
+section "Filesystem"
+printf '  %s1%s  ext4   %ssimple and robust (recommended for old disks)%s\n' "$B" "$R" "$M" "$R"
+printf '  %s2%s  btrfs  %scompression and subvolumes%s\n' "$B" "$R" "$M" "$R"
+while :; do
+    ask n "Filesystem" "1"
+    case $n in 1|ext4) FS=ext4; break ;; 2|btrfs) FS=btrfs; break ;; esac
+done
+
+LUKS=0
+if [[ $BOOT == uefi ]]; then
+    if yesno "Encrypt the disk (LUKS2, asks for a passphrase at boot)?" n; then
+        LUKS=1
+        ask_secret LUKS_PW "Disk passphrase"
+    fi
+else
+    note "BIOS mode: disk encryption is only offered on UEFI systems."
+fi
+
+# ── system ─────────────────────────────────────────────────────────
+section "System"
+while :; do
+    ask HOST "Computer name" "severian"
+    [[ $HOST =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] && break
+    note "lowercase letters, digits and '-' only"
+done
+
+while :; do
+    ask TIMEZONE "Timezone, e.g. Europe/Berlin" "UTC"
+    [[ $TIMEZONE != *..* && -f /usr/share/zoneinfo/$TIMEZONE ]] && break
+    m=$(find /usr/share/zoneinfo -type f ! -path '*/posix/*' ! -path '*/right/*' \
+        | sed 's#^/usr/share/zoneinfo/##' | grep -i -- "${TIMEZONE##*/}" | sort | head -8 || true)
+    if [[ -n $m ]]; then note "unknown timezone – did you mean:"; sed 's/^/      /' <<< "$m"
+    else note "unknown timezone – use Region/City, e.g. America/New_York"; fi
+done
+
+while :; do
+    ask loc "Language / formats, e.g. de_DE" "en_US"
+    loc=${loc%.UTF-8}; loc=${loc%.utf8}
+    LOCALE=$loc.UTF-8
+    grep -qx "$LOCALE UTF-8" /usr/share/i18n/SUPPORTED && break
+    m=$(grep -i -- "^${loc%%_*}_" /usr/share/i18n/SUPPORTED | grep ' UTF-8$' | cut -d' ' -f1 | head -8 || true)
+    if [[ -n $m ]]; then note "unknown locale – did you mean:"; sed 's/^/      /' <<< "$m"
+    else note "unknown locale – use language_COUNTRY, e.g. fr_FR"; fi
+done
+
+layouts=$(awk '/^! layout/{f=1; next} /^!/{f=0} f && NF {print $1}' /usr/share/X11/xkb/rules/base.lst)
+while :; do
+    ask KB "Keyboard layout, e.g. de, fr, gb" "us"
+    grep -qx -- "$KB" <<< "$layouts" && break
+    note "unknown layout – see the list with Super+F2"
+done
+KEYMAP=$(console_keymap "$KB")
+
+# ── user ───────────────────────────────────────────────────────────
+section "User"
+while :; do
+    ask USERNAME "User name"
+    [[ $USERNAME =~ ^[a-z_][a-z0-9_-]{0,31}$ && $USERNAME != root ]] && break
+    note "lowercase letters, digits, '_' and '-'; must start with a letter"
+done
+ask_secret USER_PW "Password for $USERNAME"
+note "root stays locked; $USERNAME gets admin rights via sudo."
+
+# ── summary ────────────────────────────────────────────────────────
+section "Summary"
+row disk     "$DISK  ($(lsblk -dno SIZE "$DISK" | tr -d ' '))  – ALL DATA WILL BE ERASED"
+row boot     "$BOOT  ($([[ $BOOT == uefi ]] && echo systemd-boot || echo GRUB))"
+row fs       "$FS$( (( LUKS )) && echo ', encrypted (LUKS2)')"
+row name     "$HOST"
+row timezone "$TIMEZONE"
+row language "$LOCALE"
+row keyboard "$KB  (console: $KEYMAP)"
+row user     "$USERNAME"
+if [[ -n $REPO_URL ]]; then
+    row repo "$REPO_URL"
+else
+    row repo "not published yet – SeverianOS updates come with new ISOs"
+fi
+
+if (( DRY )); then
+    printf '\n'; note "dry run finished – nothing was changed."; exit 0
+fi
+
+printf '\n'
+ask confirm "Type the disk name ($(basename "$DISK")) to erase it and install"
+[[ $confirm == "$(basename "$DISK")" ]] || fail "cancelled – nothing was changed"
+
+# ── install ────────────────────────────────────────────────────────
+: > "$LOG"
+exec 3>&1 4>&2                      # the real terminal, for pacstrap's progress bars
+exec > >(tee -a "$LOG") 2>&1
+trap 'printf "\n  %s✗ failed at line %s: %s%s\n  log: %s\n\n" "$E" "$LINENO" "$BASH_COMMAND" "$R" "$LOG"' ERR
+
+section "Preparing $DISK"
+umount -R "$TARGET" 2>/dev/null || true
+cryptsetup close cryptroot 2>/dev/null || true
+while read -r mp; do [[ -n $mp ]] && umount -l "$mp" 2>/dev/null || true; done \
+    < <(lsblk -lno MOUNTPOINTS "$DISK" | grep -v '^$' || true)
+swapoff "$DISK"* 2>/dev/null || true
+wipefs -af "$DISK" >/dev/null
+sgdisk --zap-all "$DISK" >/dev/null
+if [[ $BOOT == uefi ]]; then
+    sgdisk -n1:0:+1G -t1:ef00 -c1:EFI -n2:0:0 -t2:8304 -c2:SeverianOS "$DISK" >/dev/null
+else
+    sgdisk -n1:0:+1M -t1:ef02 -c1:BIOS -n2:0:0 -t2:8304 -c2:SeverianOS "$DISK" >/dev/null
+fi
+partprobe "$DISK" 2>/dev/null || true
+udevadm settle
+P1=$(part "$DISK" 1); P2=$(part "$DISK" 2)
+for _ in {1..10}; do [[ -b $P2 ]] && break; sleep 1; done
+[[ -b $P2 ]] || fail "partition $P2 did not appear"
+wipefs -af "$P1" "$P2" >/dev/null
+ok "partitions created"
+
+ROOTDEV=$P2
+if (( LUKS )); then
+    printf '%s' "$LUKS_PW" | cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$P2"
+    printf '%s' "$LUKS_PW" | cryptsetup open --key-file=- "$P2" cryptroot
+    ROOTDEV=/dev/mapper/cryptroot
+    ok "encrypted"
+fi
+
+if [[ $FS == ext4 ]]; then
+    mkfs.ext4 -q -F -L severian "$ROOTDEV"
+    mount "$ROOTDEV" "$TARGET"
+else
+    mkfs.btrfs -q -f -L severian "$ROOTDEV"
+    mount "$ROOTDEV" "$TARGET"
+    for sv in @ @home @log @pkg; do btrfs -q subvolume create "$TARGET/$sv"; done
+    umount "$TARGET"
+    O=noatime,compress=zstd:1
+    mount -o "$O,subvol=@" "$ROOTDEV" "$TARGET"
+    mount --mkdir -o "$O,subvol=@home" "$ROOTDEV" "$TARGET/home"
+    mount --mkdir -o "$O,subvol=@log"  "$ROOTDEV" "$TARGET/var/log"
+    mount --mkdir -o "$O,subvol=@pkg"  "$ROOTDEV" "$TARGET/var/cache/pacman/pkg"
+fi
+if [[ $BOOT == uefi ]]; then
+    mkfs.fat -F 32 -n EFI "$P1" >/dev/null
+    udevadm settle
+    mount --mkdir -t vfat -o umask=0077 "$P1" "$TARGET/boot"
+fi
+ok "filesystems ready"
+
+section "Choosing fast mirrors"
+if timeout 90 reflector --protocol https --latest 20 --sort rate --fastest 8 \
+        --save /etc/pacman.d/mirrorlist >/dev/null 2>&1; then
+    ok "mirror list updated"
+else
+    note "kept the default mirror list"
+fi
+
+section "Installing packages (this takes a while)"
+PKGS=(base linux linux-firmware sudo nano vim man-db severian-desktop)
+if grep -q AuthenticAMD /proc/cpuinfo; then PKGS+=(amd-ucode); fi
+if grep -q GenuineIntel /proc/cpuinfo; then PKGS+=(intel-ucode); fi
+if [[ $FS == btrfs ]]; then PKGS+=(btrfs-progs); fi
+if (( LUKS )); then PKGS+=(cryptsetup); fi
+if [[ $BOOT == bios ]]; then PKGS+=(grub); fi
+echo "pacstrap ${PKGS[*]}  (progress shown on screen only)" >> "$LOG"
+pacstrap -K "$TARGET" "${PKGS[@]}" >&3 2>&4
+genfstab -U "$TARGET" >> "$TARGET/etc/fstab"
+ok "packages installed"
+
+section "Configuring"
+ln -sf "/usr/share/zoneinfo/$TIMEZONE" "$TARGET/etc/localtime"
+ch hwclock --systohc || true
+echo 'en_US.UTF-8 UTF-8' > "$TARGET/etc/locale.gen"
+if [[ $LOCALE != en_US.UTF-8 ]]; then echo "$LOCALE UTF-8" >> "$TARGET/etc/locale.gen"; fi
+ch locale-gen >/dev/null
+echo "LANG=$LOCALE" > "$TARGET/etc/locale.conf"
+echo "KEYMAP=$KEYMAP" > "$TARGET/etc/vconsole.conf"
+echo "$HOST" > "$TARGET/etc/hostname"
+cat > "$TARGET/etc/hosts" << EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   $HOST.localdomain $HOST
+EOF
+mkdir -p "$TARGET/etc/sway/config.d"
+printf '# set by sevinstall\ninput type:keyboard xkb_layout %s\n' "$KB" \
+    > "$TARGET/etc/sway/config.d/10-severian-keyboard.conf"
+ok "time, language, keyboard"
+
+ch useradd -m -G wheel -s /bin/bash "$USERNAME"
+printf '%s:%s\n' "$USERNAME" "$USER_PW" | ch chpasswd
+ch passwd -l root >/dev/null
+install -m 440 /dev/stdin "$TARGET/etc/sudoers.d/10-wheel" <<< '%wheel ALL=(ALL:ALL) ALL'
+src_line='[[ -r /usr/share/severian/bashrc ]] && . /usr/share/severian/bashrc'
+for f in "$TARGET/etc/skel/.bashrc" "$TARGET/home/$USERNAME/.bashrc"; do
+    grep -qF severian/bashrc "$f" 2>/dev/null || printf '\n%s\n' "$src_line" >> "$f"
+done
+wb=$TARGET/home/$USERNAME/.config/waybar/config.jsonc
+if [[ $LOCALE != en_US.UTF-8 && -f $wb ]]; then
+    sed -i "s|^    \"format\": \"{:%a %d %b  %H:%M}\",|&\n    \"locale\": \"$LOCALE\",|" "$wb"
+fi
+ch runuser -u "$USERNAME" -- env HOME="/home/$USERNAME" LANG="$LOCALE" xdg-user-dirs-update || true
+ch chown -R "$USERNAME:$USERNAME" "/home/$USERNAME"
+ok "user $USERNAME"
+
+hooks="base systemd autodetect microcode modconf kms keyboard sd-vconsole block"
+if (( LUKS )); then hooks+=" sd-encrypt"; fi
+hooks+=" filesystems fsck"
+mkdir -p "$TARGET/etc/mkinitcpio.conf.d"
+printf '# set by sevinstall\nHOOKS=(%s)\n' "$hooks" > "$TARGET/etc/mkinitcpio.conf.d/10-severian.conf"
+ch mkinitcpio -P
+ok "initramfs"
+
+if (( LUKS )); then
+    CMDLINE="rd.luks.name=$(blkid -s UUID -o value "$P2")=cryptroot root=/dev/mapper/cryptroot"
+else
+    CMDLINE="root=UUID=$(blkid -s UUID -o value "$ROOTDEV")"
+fi
+CMDLINE+=" rw"
+if [[ $FS == btrfs ]]; then CMDLINE+=" rootflags=subvol=@"; fi
+CMDLINE+=" quiet loglevel=3 $VT"
+
+if [[ $BOOT == uefi ]]; then
+    ch bootctl --esp-path=/boot install
+    mkdir -p "$TARGET/boot/loader/entries"
+    cat > "$TARGET/boot/loader/loader.conf" << EOF
+default severian.conf
+timeout 3
+console-mode max
+editor no
+EOF
+    cat > "$TARGET/boot/loader/entries/severian.conf" << EOF
+title   SeverianOS
+linux   /vmlinuz-linux
+initrd  /initramfs-linux.img
+options $CMDLINE
+EOF
+    if [[ -f $TARGET/boot/initramfs-linux-fallback.img ]]; then
+        cat > "$TARGET/boot/loader/entries/severian-fallback.conf" << EOF
+title   SeverianOS (fallback)
+linux   /vmlinuz-linux
+initrd  /initramfs-linux-fallback.img
+options ${CMDLINE/ quiet loglevel=3/}
+EOF
+    fi
+    ch systemctl enable systemd-boot-update.service >/dev/null
+    ok "boot loader (systemd-boot)"
+else
+    ch grub-install --target=i386-pc "$DISK"
+    sed -i \
+        -e 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="SeverianOS"/' \
+        -e 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/' \
+        -e "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"quiet loglevel=3 $VT\"|" \
+        "$TARGET/etc/default/grub"
+    ch grub-mkconfig -o /boot/grub/grub.cfg
+    ok "boot loader (GRUB)"
+fi
+
+cat > "$TARGET/etc/greetd/config.toml" << 'EOF'
+# SeverianOS login (set by sevinstall)
+[terminal]
+vt = 1
+
+[default_session]
+command = "tuigreet --time --remember --asterisks --greeting 'SeverianOS' --cmd severian-session"
+user = "greeter"
+EOF
+
+if compgen -G "/etc/NetworkManager/system-connections/*" >/dev/null; then
+    install -d -m 700 "$TARGET/etc/NetworkManager/system-connections"
+    cp /etc/NetworkManager/system-connections/* "$TARGET/etc/NetworkManager/system-connections/"
+    chmod 600 "$TARGET"/etc/NetworkManager/system-connections/*
+    ok "Wi-Fi connections from the live session copied"
+fi
+
+sed -i -e 's/^#Color/Color/' -e 's/^#ParallelDownloads.*/ParallelDownloads = 5/' "$TARGET/etc/pacman.conf"
+if [[ -n $REPO_URL ]]; then
+    cat >> "$TARGET/etc/pacman.conf" << EOF
+
+[severian]
+SigLevel = Optional TrustAll
+Server = $REPO_URL
+EOF
+    ok "severian repo enabled"
+fi
+
+ch systemctl enable NetworkManager.service iwd.service greetd.service bluetooth.service \
+    power-profiles-daemon.service systemd-timesyncd.service systemd-oomd.service \
+    fstrim.timer paccache.timer >/dev/null
+ok "services"
+
+section "Finishing"
+cp "$LOG" "$TARGET/var/log/sevinstall.log"
+sync
+fuser -km "$TARGET" >/dev/null 2>&1 || true   # e.g. gpg-agent started by pacstrap -K
+sleep 1
+umount -R "$TARGET" || umount -R -l "$TARGET"
+if (( LUKS )); then cryptsetup close cryptroot; fi
+ok "SeverianOS is installed"
+printf '\n  %sRemove the USB stick, then reboot.%s\n\n' "$F" "$R"
+if yesno "Reboot now?" y; then systemctl reboot; fi

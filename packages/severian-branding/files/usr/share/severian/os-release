@@ -1,0 +1,8 @@
+NAME="SeverianOS"
+PRETTY_NAME="SeverianOS"
+ID=severianos
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;181;82;59"
+HOME_URL="https://github.com/getseverianos"
+LOGO=severianos

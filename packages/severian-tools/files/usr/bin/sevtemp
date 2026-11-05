@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# sevtemp — CPU temperature for Waybar (AMD k10temp/zenpower, Intel coretemp, ACPI fallback)
+# Prints JSON for "return-type": "json". No usable sensor → empty text, the module hides.
+# Implausible readings (below 20 °C or above 120 °C) are skipped: k10temp on
+# AMD Trinity/Richland APUs (e.g. A10-6700) only reports a relative value.
+
+crit=${1:-85}
+for want in k10temp zenpower coretemp cpu_thermal acpitz; do
+    for h in /sys/class/hwmon/hwmon*; do
+        [[ $(cat "$h/name" 2>/dev/null) == "$want" ]] || continue
+        for t in "$h"/temp*_input; do
+            [[ -r $t ]] || continue
+            v=$(( $(cat "$t") / 1000 ))
+            (( v < 20 || v > 120 )) && continue
+            cls=; (( v >= crit )) && cls=critical
+            printf '{"text":"%s°","tooltip":"%s","class":"%s"}\n' "$v" "$want" "$cls"
+            exit 0
+        done
+    done
+done
+printf '{"text":""}\n'

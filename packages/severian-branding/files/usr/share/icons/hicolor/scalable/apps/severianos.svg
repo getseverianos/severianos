@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- SeverianOS: die alte Sonne am Horizont, eine Glut steigt auf -->
+  <defs><clipPath id="sky"><rect x="0" y="0" width="256" height="188"/></clipPath></defs>
+  <circle cx="128" cy="140" r="78" fill="none" stroke="#d8d2c6" stroke-width="7" clip-path="url(#sky)"/>
+  <line x1="30" y1="191" x2="226" y2="191" stroke="#d8d2c6" stroke-width="7"/>
+  <circle cx="128" cy="160" r="19" fill="#b5523b"/>
+</svg>

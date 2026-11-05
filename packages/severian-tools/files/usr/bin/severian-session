@@ -1,0 +1,18 @@
+#!/bin/sh
+# severian-session — start Sway with SeverianOS defaults.
+# Used by the greeter (tuigreet) and by the live medium. Logs go to the journal:
+#   journalctl --user -t sway   or   journalctl -t sway
+
+export XDG_CURRENT_DESKTOP=sway
+export XDG_SESSION_DESKTOP=sway
+export XDG_SESSION_TYPE=wayland
+export QT_QPA_PLATFORM="wayland;xcb"
+export _JAVA_AWT_WM_NONREPARENTING=1
+export MOZ_ENABLE_WAYLAND=1
+
+# Virtual machines often lack a hardware cursor plane
+if systemd-detect-virt -q --vm 2>/dev/null; then
+    export WLR_NO_HARDWARE_CURSORS=1
+fi
+
+exec systemd-cat --identifier=sway sway "$@"

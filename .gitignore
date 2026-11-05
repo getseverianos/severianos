@@ -1,0 +1,6 @@
+build/
+out/
+vm/
+*.iso
+*.pkg.tar.zst
+*.log

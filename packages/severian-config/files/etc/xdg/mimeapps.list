@@ -1,0 +1,22 @@
+# SeverianOS default applications. Your own choices go to ~/.config/mimeapps.list.
+[Default Applications]
+x-scheme-handler/http=sevbrowser.desktop
+x-scheme-handler/https=sevbrowser.desktop
+text/html=sevbrowser.desktop
+application/xhtml+xml=sevbrowser.desktop
+application/pdf=sevbrowser.desktop
+inode/directory=thunar.desktop
+image/png=imv.desktop
+image/jpeg=imv.desktop
+image/gif=imv.desktop
+image/webp=imv.desktop
+image/bmp=imv.desktop
+image/svg+xml=imv.desktop
+video/mp4=mpv.desktop
+video/webm=mpv.desktop
+video/x-matroska=mpv.desktop
+video/quicktime=mpv.desktop
+audio/mpeg=mpv.desktop
+audio/flac=mpv.desktop
+audio/ogg=mpv.desktop
+audio/x-wav=mpv.desktop
