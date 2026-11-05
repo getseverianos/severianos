@@ -9,7 +9,7 @@
 #          root: ext4 or btrfs (@ @home @log @pkg), optional LUKS2 (UEFI only)
 set -Eeuo pipefail
 
-VERSION=0.1.1
+VERSION=0.1.2
 TARGET=/mnt
 LOG=/var/log/sevinstall.log
 CONF=/usr/share/severian/installer.conf
@@ -96,6 +96,27 @@ printf '\n  %s●%s %sSeverianOS installer%s %s%s%s\n' "$E" "$R" "$F" "$R" "$M" 
 note "Ctrl+C cancels at any point before the final confirmation."
 
 if [[ -d /sys/firmware/efi/efivars ]]; then BOOT=uefi; else BOOT=bios; fi
+
+# ── keyboard (first, so passwords are typed with the final layout) ──
+section "Keyboard"
+layouts=$(awk '/^! layout/{f=1; next} /^!/{f=0} f && NF {print $1}' /usr/share/X11/xkb/rules/base.lst)
+while :; do
+    ask KB "Keyboard layout, e.g. de, fr, gb" "us"
+    grep -qx -- "$KB" <<< "$layouts" && break
+    note "unknown layout – see the list with Super+F2"
+done
+KEYMAP=$(console_keymap "$KB")
+switched=0
+for sock in /run/user/*/sway-ipc.*.sock; do
+    [[ -S $sock ]] || continue
+    swaymsg -s "$sock" "input type:keyboard xkb_layout $KB" >/dev/null 2>&1 && switched=1
+done
+loadkeys "$KEYMAP" >/dev/null 2>&1 || true
+if (( switched )); then
+    ok "keyboard switched to $KB – type everything from here on with this layout"
+else
+    note "could not switch the live keyboard – passwords are typed with the current layout"
+fi
 
 # ── network ────────────────────────────────────────────────────────
 section "Network"
@@ -193,13 +214,6 @@ while :; do
     else note "unknown locale – use language_COUNTRY, e.g. fr_FR"; fi
 done
 
-layouts=$(awk '/^! layout/{f=1; next} /^!/{f=0} f && NF {print $1}' /usr/share/X11/xkb/rules/base.lst)
-while :; do
-    ask KB "Keyboard layout, e.g. de, fr, gb" "us"
-    grep -qx -- "$KB" <<< "$layouts" && break
-    note "unknown layout – see the list with Super+F2"
-done
-KEYMAP=$(console_keymap "$KB")
 
 # ── user ───────────────────────────────────────────────────────────
 section "User"

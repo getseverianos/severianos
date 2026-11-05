@@ -30,4 +30,6 @@ First version of SeverianOS as a real distribution.
 - Firefox uses its built-in dark theme; on first login GTK and portal-aware
   apps are told to prefer dark (gsettings)
 - Start page no longer clips or overlaps in small windows
+- Installer asks for the keyboard layout first and switches the live
+  session to it, so passwords are typed exactly as they will be at boot
 - Tested: QEMU/KVM, AMD A10-6700 (radeon)
