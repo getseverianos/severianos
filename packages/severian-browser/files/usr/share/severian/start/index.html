@@ -10,8 +10,9 @@
     --text: #d8d2c6; --bright: #e6e1d8; --ember: #b5523b; --brass: #c9a66b;
   }
   * { box-sizing: border-box; margin: 0; }
-  html, body { height: 100%; }
+  html { height: 100%; }
   body {
+    min-height: 100%; padding: 3rem 1rem 2rem;
     background: var(--bg); color: var(--text);
     font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -24,7 +25,7 @@
   input {
     width: 100%; padding: .85rem 1rem; font: inherit; font-size: 1rem;
     background: var(--surface); color: var(--bright);
-    border: 1px solid var(--line); border-radius: 0; outline: none;
+    border: 1px solid var(--line); border-radius: 6px; outline: none;
   }
   input::placeholder { color: var(--muted); }
   input:focus { border-color: var(--ember); }
@@ -33,7 +34,8 @@
     font-size: .8rem; color: var(--muted);
   }
   .keys b { color: var(--brass); font-weight: normal; text-align: right; }
-  .foot { position: fixed; bottom: 1.2rem; font-size: .72rem; color: #46444a; letter-spacing: .3em; }
+  .foot { margin-top: 1.5rem; font-size: .72rem; color: #46444a; letter-spacing: .3em; }
+  @media (max-height: 640px) { .foot { display: none; } body { gap: 1.6rem; } }
 </style>
 </head>
 <body>

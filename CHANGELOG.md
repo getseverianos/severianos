@@ -25,4 +25,9 @@ First version of SeverianOS as a real distribution.
 - Installer: EFI partition mounted as vfat explicitly, visible download
   progress, stray gpg-agent no longer blocks unmounting, window stays open
 - First successful install: QEMU/KVM, UEFI, ext4
+- 6 px rounded corners for the launcher, notifications, tooltips and the
+  start page (window corners stay square – plain Sway cannot round them)
+- Firefox uses its built-in dark theme; on first login GTK and portal-aware
+  apps are told to prefer dark (gsettings)
+- Start page no longer clips or overlaps in small windows
 - Tested: QEMU/KVM, AMD A10-6700 (radeon)

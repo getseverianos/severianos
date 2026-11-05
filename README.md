@@ -8,6 +8,10 @@ single ember accent — from the boot menu to the shell prompt. It aims to run
 well on as many machines as possible, from a ten-year-old desktop to a current
 laptop.
 
+It is small on purpose: **about 550 MB of RAM after login** (measured in a VM;
+real-hardware numbers will follow). Every new feature has to justify its weight
+against that number.
+
 > SeverianOS is not affiliated with or endorsed by Arch Linux.
 > Please report SeverianOS issues here, not on the Arch forums or bug tracker.
 
@@ -40,6 +44,9 @@ laptop.
 - **Graphics:** AMD and Intel via Mesa. **Nvidia is not supported.**
 - **Firmware:** UEFI (recommended) or legacy BIOS
 - **Memory:** 4 GB recommended (less is untested)
+- **Kernel:** the current `linux` kernel. Want a long-term kernel as a fallback?
+  `sudo pacman -S linux-lts` – it appears in the boot menu after the next
+  kernel update, or add an entry in `/boot/loader/entries/` yourself.
 - Details and tested machines: [docs/hardware.md](docs/hardware.md)
 
 ## Install

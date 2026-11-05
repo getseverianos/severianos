@@ -1,7 +1,7 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-browser
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc='sevbrowser – Firefox with SeverianOS policies: no telemetry, local start page'
 arch=('any')
 url='https://github.com/getseverianos'

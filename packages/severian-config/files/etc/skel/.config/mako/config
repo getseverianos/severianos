@@ -4,6 +4,7 @@ background-color=#121214
 text-color=#d8d2c6
 border-color=#b5523b
 border-size=2
+border-radius=6
 padding=12
 margin=10
 width=340
