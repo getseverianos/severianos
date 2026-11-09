@@ -16,4 +16,4 @@ PUBLISH_TAG="x86_64"
 # Public URL of the [severian] repo, written into installed systems.
 # Leave empty until ./build.sh publish has run once and the URL works:
 # pacman refuses to update when a configured repo is unreachable.
-REPO_URL=""
+REPO_URL="https://github.com/getseverianos/packages/releases/download/x86_64"
