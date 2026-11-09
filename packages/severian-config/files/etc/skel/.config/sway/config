@@ -121,6 +121,8 @@ bindsym XF86MonBrightnessUp exec brightnessctl set 5%+
 bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
 bindsym Print exec grim -g "$(slurp -b 12121499 -c b5523bff -w 2)" - | wl-copy
 bindsym Shift+Print exec grim - | wl-copy
+bindsym $mod+Print exec sevshot
+bindsym $mod+Shift+Print exec sevshot full
 
 # ── Window rules ──────────────────────────────
 for_window [app_id="sevhelp"] floating enable
@@ -142,6 +144,7 @@ exec mako
 exec sevidle
 exec /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 exec sevwelcome
+exec sevbattery
 
 include /etc/sway/config.d/*
 include ~/.config/sway/config.d/*

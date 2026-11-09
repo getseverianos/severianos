@@ -7,13 +7,15 @@
 skel=/etc/skel/.config
 cfg=${XDG_CONFIG_HOME:-$HOME/.config}
 apps=(sway waybar foot fuzzel mako swaylock swaynag imv mpv gtk-3.0 gtk-4.0)
+# lines the installer adapts for you (e.g. the clock language) are not "your" changes
+ignore=(-I '"locale":')
 
 e=$'\e[38;2;181;82;59m'; f=$'\e[38;2;216;210;198m'; m=$'\e[38;2;111;106;98m'
 b=$'\e[38;2;201;166;107m'; g=$'\e[38;2;127;154;101m'; r=$'\e[0m'
 
 state() { # default | changed | missing
     if [[ ! -e $cfg/$1 ]]; then echo missing
-    elif diff -rq -x config.d "$skel/$1" "$cfg/$1" >/dev/null 2>&1; then echo default
+    elif diff -rq -x config.d "${ignore[@]}" "$skel/$1" "$cfg/$1" >/dev/null 2>&1; then echo default
     else echo changed; fi
 }
 
@@ -36,7 +38,7 @@ status)
     ;;
 diff)
     a=${2:?usage: sevconfig diff APP}
-    diff -ru --color=auto -x config.d "$skel/$a" "$cfg/$a"
+    diff -ru --color=auto -x config.d "${ignore[@]}" "$skel/$a" "$cfg/$a"
     ;;
 reset)
     target=${2:?usage: sevconfig reset APP|all}

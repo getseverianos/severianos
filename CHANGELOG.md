@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-11-09
 
 First version of SeverianOS as a real distribution.
 
@@ -41,4 +41,12 @@ First version of SeverianOS as a real distribution.
 - Installer removes the sync databases of the live medium, so the first
   update on the new system fetches a matching, signed database
 - First update delivered through the signed [severian] repo
-- Tested: QEMU/KVM, AMD A10-6700 (radeon)
+- `sevbattery`: notifications at 10 % and 5 % battery
+- `sevshot`: Super+Print saves screenshots to ~/Pictures/Screenshots
+- `sevconfig` no longer reports the installer's clock-language line as a change
+- Installer explains legacy BIOS mode and how to switch to UEFI
+- Versioned ISO (`severianos-0.1.0-x86_64.iso`), `./build.sh release`
+- Docs: getting started, known issues, SECURITY.md, hardware results
+- Tested: QEMU/KVM (all install paths), AMD A10-6700 (live, radeon),
+  ThinkPad T440p (installed, all hardware working; under 600 MB RAM,
+  4.3 GB disk)

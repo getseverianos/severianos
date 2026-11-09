@@ -34,6 +34,8 @@ k "super + shift + 1…9"    "move window there"
 
 h "more"
 k "print"                  "region → clipboard"
+k "super + print"          "region → ~/Pictures/Screenshots"
+k "super + shift + print"  "whole screen → file"
 k "super + f2"             "keyboard layout"
 k "super + shift + c"      "reload config"
 k "click on the bar"       "eth/wlan: network · bt: bluetooth"

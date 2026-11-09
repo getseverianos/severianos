@@ -23,9 +23,11 @@ About 10 GB of free space. Never build in `/tmp` (it is RAM on most systems).
 | `packages` | `makepkg` builds each folder in `packages/` into `build/repo/`    |
 | `repo`     | `repo-add` creates the `[severian]` repo database                 |
 | `iso`      | copies `iso/` to `build/profile/`, wires in the repo, runs `mkarchiso` |
+| `publish`  | uploads the signed repo to github.com/getseverianos/packages      |
+| `release`  | tags `v$(cat VERSION)` and creates a draft GitHub release with the ISO |
 
-The finished ISO lands in `OUT_DIR` (default `~/severian/out`) together with
-`.sha256` and `.b2` checksums.
+The finished ISO (`severianos-<VERSION>-x86_64.iso`) lands in `OUT_DIR`
+(default `~/severian/out`) with `.sha256`, `.b2` and – when signing – `.sig`.
 
 ### How the repo reaches the ISO
 

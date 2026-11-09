@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# sevshot — save a screenshot to ~/Pictures/Screenshots and copy it to the clipboard
+#   sevshot          select a region
+#   sevshot full     the whole screen
+
+dir=$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Screenshots
+mkdir -p "$dir"
+file=$dir/$(date +%Y-%m-%d_%H-%M-%S).png
+
+if [[ ${1:-} == full ]]; then
+    grim "$file" || exit 1
+else
+    region=$(slurp -b 12121499 -c b5523bff -w 2) || exit 0
+    grim -g "$region" "$file" || exit 1
+fi
+
+wl-copy < "$file"
+notify-send -a SeverianOS -i "$file" "Screenshot saved" "${file/#$HOME/\~}"

@@ -1,13 +1,13 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-tools
 pkgver=0.1.0
-pkgrel=4
-pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp'
+pkgrel=5
+pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp, sevbattery, sevshot'
 arch=('any')
 url='https://github.com/getseverianos'
 license=('GPL-3.0-or-later')
 depends=('bash' 'coreutils' 'gawk' 'sed' 'diffutils' 'procps-ng' 'sudo'
-         'fuzzel' 'libnotify' 'pacman-contrib' 'fakeroot' 'xkeyboard-config')
+         'fuzzel' 'libnotify' 'grim' 'slurp' 'wl-clipboard' 'xdg-user-dirs' 'pacman-contrib' 'fakeroot' 'xkeyboard-config')
 optdepends=('sway: severian-session, sevkeyboard, sevpower'
             'swaylock: lock from sevpower')
 options=('!strip' '!debug')

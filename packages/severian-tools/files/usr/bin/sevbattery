@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# sevbattery — warn before the battery runs out.
+# Started by Sway. Checks once a minute; does nothing on machines without a battery.
+#   10 %  normal notification
+#    5 %  critical notification (stays until dismissed)
+# Warnings reset when the charger is plugged in.
+
+shopt -s nullglob
+bats=(/sys/class/power_supply/BAT*)
+(( ${#bats[@]} )) || exit 0
+
+warned=100
+while :; do
+    cap=0 n=0 discharging=0
+    for b in "${bats[@]}"; do
+        [[ -r $b/capacity ]] || continue
+        cap=$(( cap + $(cat "$b/capacity") )); n=$(( n + 1 ))
+        [[ $(cat "$b/status" 2>/dev/null) == Discharging ]] && discharging=1
+    done
+    (( n )) && cap=$(( cap / n ))
+
+    if (( ! discharging )); then
+        warned=100
+    elif (( cap <= 5 && warned > 5 )); then
+        notify-send -a SeverianOS -u critical "Battery at ${cap} %" "Plug in the charger now."
+        warned=5
+    elif (( cap <= 10 && warned > 10 )); then
+        notify-send -a SeverianOS "Battery at ${cap} %" "Time to find a charger."
+        warned=10
+    fi
+    sleep 60
+done
