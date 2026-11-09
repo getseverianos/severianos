@@ -34,9 +34,9 @@ pkill -f "qemu-system-x86_64.*severian-vm" 2>/dev/null && sleep 1 || true
 
 # shellcheck disable=SC2054  # commas are part of qemu options
 args=(
-    -name severian-vm -no-quit
+    -name severian-vm
     -enable-kvm -machine q35 -cpu host -smp 2 -m 3072
-    -device virtio-vga -display gtk
+    -device virtio-vga -display gtk,window-close=off
     -nic user,model=virtio-net-pci
     -device qemu-xhci -device usb-tablet
 )
@@ -65,5 +65,5 @@ case $mode in
         sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
 
-echo "starting VM ($mode, $fw) – close the window to stop it"
+echo "starting VM ($mode, $fw) – stop it with: scripts/vm.sh <next mode>, or power off inside"
 exec qemu-system-x86_64 "${args[@]}"
