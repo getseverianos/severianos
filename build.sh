@@ -6,6 +6,7 @@
 #   ./build.sh repo       create the local [severian] repo from the built packages
 #   ./build.sh iso        build the ISO with that repo (asks for sudo)
 #   ./build.sh all        check + packages + repo + iso
+#   ./build.sh publish    upload the signed repo to GitHub (PUBLISH_REPO, PUBLISH_TAG)
 #   ./build.sh clean      remove build/
 #
 # Settings: config.sh
@@ -47,6 +48,18 @@ check() {
     done
     (( missing == 0 )) || die "fix the package names above"
     ok "all dependencies available"
+    if [[ -n $GPG_KEY ]]; then
+        gpg --list-secret-keys "$GPG_KEY" >/dev/null 2>&1 || die "signing key $GPG_KEY not in your GPG keyring"
+        local kr=$ROOT/packages/severian-keyring/files/usr/share/pacman/keyrings
+        if [[ ! -s $kr/severian.gpg ]]; then
+            gpg --export --armor "$GPG_KEY" > "$kr/severian.gpg"
+            note "exported the public key to packages/severian-keyring/ – commit it"
+        fi
+        grep -q "^${GPG_KEY}:" "$kr/severian-trusted" || die "$GPG_KEY is not listed in severian-trusted"
+        ok "signing key $GPG_KEY"
+    else
+        note "GPG_KEY empty – packages and ISO will be unsigned"
+    fi
 }
 
 packages() {
@@ -55,6 +68,7 @@ packages() {
     local sign=() d
     [[ -n $GPG_KEY ]] && sign=(--sign --key "$GPG_KEY")
     export SEVERIAN_REPO_URL=$REPO_URL
+    if [[ -n $GPG_KEY ]]; then export SEVERIAN_REPO_SIGLEVEL=Required; else export SEVERIAN_REPO_SIGLEVEL='Optional TrustAll'; fi
     for d in $(pkgdirs); do
         ( cd "$d" && PKGDEST=$REPO BUILDDIR=$BUILD/makepkg PKGEXT=.pkg.tar.zst \
             makepkg --force --clean --cleanbuild --nodeps --noconfirm "${sign[@]}" >/dev/null ) \
@@ -112,12 +126,57 @@ iso() {
     note "test it: scripts/vm.sh live   ·   install test: scripts/vm.sh install"
 }
 
+publish() {
+    step "Publishing the repo to github.com/$PUBLISH_REPO (release $PUBLISH_TAG)"
+    command -v gh >/dev/null || die "github-cli missing – sudo pacman -S github-cli"
+    [[ -n ${PUBLISH_REPO:-} && -n ${PUBLISH_TAG:-} ]] || die "set PUBLISH_REPO and PUBLISH_TAG in config.sh"
+    [[ -f $REPO/severian.db.tar.zst ]] || die "no repo yet – ./build.sh packages && ./build.sh repo"
+    if [[ -n $GPG_KEY ]]; then
+        [[ -f $REPO/severian.db.tar.zst.sig ]] || die "repo is not signed – rebuild with GPG_KEY set"
+    else
+        note "publishing UNSIGNED packages"
+    fi
+    gh repo view "$PUBLISH_REPO" >/dev/null 2>&1 || die "github.com/$PUBLISH_REPO does not exist – create it first (public)"
+
+    # GitHub release assets cannot be symlinks, and pacman asks for "severian.db":
+    # upload real files under the names pacman expects.
+    local stage=$BUILD/publish f
+    rm -rf "$stage"; mkdir -p "$stage"
+    cp "$REPO"/*.pkg.tar.zst "$stage/"
+    if compgen -G "$REPO/*.pkg.tar.zst.sig" >/dev/null; then cp "$REPO"/*.pkg.tar.zst.sig "$stage/"; fi
+    cp "$REPO/severian.db.tar.zst"    "$stage/severian.db"
+    cp "$REPO/severian.files.tar.zst" "$stage/severian.files"
+    if [[ -f $REPO/severian.db.tar.zst.sig ]];    then cp "$REPO/severian.db.tar.zst.sig"    "$stage/severian.db.sig"; fi
+    if [[ -f $REPO/severian.files.tar.zst.sig ]]; then cp "$REPO/severian.files.tar.zst.sig" "$stage/severian.files.sig"; fi
+
+    if ! gh release view "$PUBLISH_TAG" -R "$PUBLISH_REPO" >/dev/null 2>&1; then
+        gh release create "$PUBLISH_TAG" -R "$PUBLISH_REPO" --title "SeverianOS packages ($PUBLISH_TAG)" \
+            --notes "Binary package repository for SeverianOS, used by pacman. Signed with 614E5176E3257EA92972F3D41CC2187B6745B29E." >/dev/null
+        ok "release $PUBLISH_TAG created"
+    fi
+    gh release upload "$PUBLISH_TAG" "$stage"/* -R "$PUBLISH_REPO" --clobber
+    ok "$(find "$stage" -type f | wc -l) files uploaded"
+
+    # remove assets that are no longer part of the repo (old package versions)
+    local keep; keep=$(find "$stage" -type f -printf '%f\n')
+    while read -r f; do
+        [[ -z $f ]] && continue
+        grep -qxF -- "$f" <<< "$keep" && continue
+        gh release delete-asset "$PUBLISH_TAG" "$f" -R "$PUBLISH_REPO" -y >/dev/null && note "removed old $f"
+    done < <(gh release view "$PUBLISH_TAG" -R "$PUBLISH_REPO" --json assets -q '.assets[].name')
+
+    local url="https://github.com/$PUBLISH_REPO/releases/download/$PUBLISH_TAG"
+    ok "repo online: $url"
+    [[ $REPO_URL == "$url" ]] || note "set REPO_URL=\"$url\" in config.sh, then rebuild (./build.sh all)"
+}
+
 case ${1:-all} in
     check)    check ;;
     packages) packages ;;
     repo)     repo ;;
     iso)      iso ;;
     all)      check; packages; repo; iso ;;
+    publish)  publish ;;
     clean)    sudo rm -rf "$BUILD"; ok "build/ removed" ;;
-    *)        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *)        sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

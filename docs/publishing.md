@@ -1,53 +1,76 @@
 # Publishing SeverianOS
 
-Everything so far works locally. To make SeverianOS public:
+## Where things live
 
-## 1. Source code
+| what                    | where                                               | visibility |
+|-------------------------|-----------------------------------------------------|------------|
+| source code             | github.com/getseverianos/severianos                 | private until 0.1 |
+| package repo (binaries) | github.com/getseverianos/packages, release `x86_64` | public     |
+| ISO releases            | github.com/getseverianos/severianos/releases        | with 0.1   |
+
+The package repo has to be public from the start: pacman cannot download
+release files from a private repository.
+
+## The signing key
+
+SeverianOS is signed with
+
+    614E5176E3257EA92972F3D41CC2187B6745B29E   SeverianOS Build Key (ed25519, expires 2028-11-04)
+
+- `GPG_KEY` in `config.sh` holds this fingerprint; `build.sh` then signs every
+  package, the repo database and the ISO.
+- The public key ships in `severian-keyring`
+  (`packages/severian-keyring/files/usr/share/pacman/keyrings/`): `severian.gpg`,
+  `severian-trusted` (fingerprint), `severian-revoked`.
+- Installing or upgrading `severian-keyring` runs `pacman-key --populate severian`.
+- Installed systems use `SigLevel = Required` for `[severian]`: unsigned or
+  foreign-signed packages are refused.
+
+**Backups:** the secret key (`gpg --export-secret-keys --armor`) and the
+revocation certificate (`~/.gnupg/openpgp-revocs.d/<fingerprint>.rev`) live
+offline on a USB stick. Never in git, never in a chat.
+
+**Expiry:** extend before 2028-11-04 with `gpg --quick-set-expire <fpr> 2y`,
+then rebuild and publish `severian-keyring` with the refreshed `severian.gpg`.
+
+**If the key is ever compromised:** import the revocation certificate, move the
+fingerprint into `severian-revoked`, create a new key, ship both in a new
+`severian-keyring`.
+
+## Publishing packages
 
 ```sh
-cd ~/severian/src
-git init && git add . && git commit -m "SeverianOS 0.1.0"
+./build.sh packages && ./build.sh repo     # build and sign
+./build.sh publish                         # upload to getseverianos/packages
 ```
 
-Create the GitHub organisation/repository and push. `build/` and ISOs stay out
-of git (`.gitignore`).
+`publish` uploads the packages, their signatures and `severian.db` / `.files`
+(as real files – GitHub release assets cannot be symlinks), and deletes assets
+of package versions that are no longer in the repo.
 
-## 2. A signing key
+Installed systems pick up new packages with `sevupdate` (or `pacman -Syu`).
+Only packages whose version went up are updated – always raise `pkgrel`.
 
-Users must be able to trust packages and ISOs.
+## Enabling updates on installed systems
+
+Once the first `publish` worked, set in `config.sh`:
 
 ```sh
-gpg --full-generate-key            # ed25519, "SeverianOS Build Key"
-gpg --list-secret-keys --keyid-format long
+REPO_URL="https://github.com/getseverianos/packages/releases/download/x86_64"
 ```
 
-Put the key ID into `GPG_KEY` in `config.sh`. `build.sh` then signs every
-package, the repo database and the ISO. Keep a backup of the key offline.
+and rebuild (`./build.sh all`). Systems installed from that ISO get
+`[severian]` in `/etc/pacman.conf`. Never set `REPO_URL` before the URL works:
+pacman refuses to update when a configured repo is unreachable.
 
-Next step after that (not done yet): a `severian-keyring` package that ships
-the public key, so installed systems can use `SigLevel = Required`.
-
-## 3. The package repo
-
-Upload the contents of `build/repo/` (`*.pkg.tar.zst`, `*.sig`, `severian.db*`,
-`severian.files*`) to a GitHub release, e.g. tag `x86_64`. Then set:
-
-```sh
-REPO_URL="https://github.com/<org>/<repo>/releases/download/x86_64"
-```
-
-Rebuild. From now on `sevinstall` adds `[severian]` to installed systems, and
-`sevupdate` delivers new SeverianOS packages like any other update.
-
-Do **not** set `REPO_URL` before the URL works: pacman refuses to update when
-a configured repo is unreachable.
-
-## 4. A release
+## A release
 
 1. Raise versions in the changed PKGBUILDs, update `CHANGELOG.md`.
-2. `./build.sh all`
+2. `./build.sh all && ./build.sh publish`
 3. Test: `scripts/vm.sh install` (UEFI and BIOS), then real hardware.
-4. Upload ISO + `.sha256` + `.b2` (+ `.sig`) to a GitHub release.
+4. `git tag v0.x.y && git push --tags`
+5. Create a GitHub release in `getseverianos/severianos` with the ISO,
+   `.sha256`, `.b2` and `.sig`.
 
 ## Arch Linux trademark
 

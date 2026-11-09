@@ -32,4 +32,9 @@ First version of SeverianOS as a real distribution.
 - Start page no longer clips or overlaps in small windows
 - Installer asks for the keyboard layout first and switches the live
   session to it, so passwords are typed exactly as they will be at boot
+- Signed packages: `severian-keyring` ships the SeverianOS key
+  (614E5176E3257EA92972F3D41CC2187B6745B29E); installed systems use
+  `SigLevel = Required` for `[severian]`
+- `./build.sh publish` uploads the signed repo to
+  github.com/getseverianos/packages (release `x86_64`)
 - Tested: QEMU/KVM, AMD A10-6700 (radeon)

@@ -1,0 +1,20 @@
+# Maintainer: SeverianOS <https://github.com/getseverianos>
+# The public signing key of SeverianOS. pacman trusts packages from the
+# [severian] repo only if they are signed with a key listed here.
+pkgname=severian-keyring
+pkgver=20261105
+pkgrel=1
+pkgdesc='SeverianOS PGP keyring'
+arch=('any')
+url='https://github.com/getseverianos'
+license=('GPL-3.0-or-later')
+install=severian-keyring.install
+options=('!strip' '!debug')
+
+package() {
+    local k="$startdir/files/usr/share/pacman/keyrings"
+    [[ -s $k/severian.gpg ]] || { echo "severian.gpg missing – export the public key first (see docs/publishing.md)"; return 1; }
+    install -Dm644 "$k/severian.gpg"     "$pkgdir/usr/share/pacman/keyrings/severian.gpg"
+    install -Dm644 "$k/severian-trusted" "$pkgdir/usr/share/pacman/keyrings/severian-trusted"
+    install -Dm644 "$k/severian-revoked" "$pkgdir/usr/share/pacman/keyrings/severian-revoked"
+}

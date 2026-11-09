@@ -9,13 +9,14 @@
 #          root: ext4 or btrfs (@ @home @log @pkg), optional LUKS2 (UEFI only)
 set -Eeuo pipefail
 
-VERSION=0.1.2
+VERSION=0.1.3
 TARGET=/mnt
 LOG=/var/log/sevinstall.log
 CONF=/usr/share/severian/installer.conf
 DRY=0
 [[ ${1:-} == --dry-run ]] && DRY=1
 REPO_URL=
+REPO_SIGLEVEL='Optional TrustAll'
 # answers, filled in by ask/ask_secret via printf -v
 n='' m='' confirm='' FS='' HOST='' TIMEZONE='' loc='' KB='' USERNAME='' USER_PW='' LUKS_PW=''
 # shellcheck disable=SC1090
@@ -314,7 +315,7 @@ else
 fi
 
 section "Installing packages (this takes a while)"
-PKGS=(base linux linux-firmware sudo nano vim man-db severian-desktop)
+PKGS=(base linux linux-firmware sudo nano vim man-db severian-keyring severian-desktop)
 if grep -q AuthenticAMD /proc/cpuinfo; then PKGS+=(amd-ucode); fi
 if grep -q GenuineIntel /proc/cpuinfo; then PKGS+=(intel-ucode); fi
 if [[ $FS == btrfs ]]; then PKGS+=(btrfs-progs); fi
@@ -435,7 +436,7 @@ if [[ -n $REPO_URL ]]; then
     cat >> "$TARGET/etc/pacman.conf" << EOF
 
 [severian]
-SigLevel = Optional TrustAll
+SigLevel = $REPO_SIGLEVEL
 Server = $REPO_URL
 EOF
     ok "severian repo enabled"

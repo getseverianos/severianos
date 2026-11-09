@@ -2,14 +2,14 @@
 # Meta package: installing this turns a base system into SeverianOS.
 pkgname=severian-desktop
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc='SeverianOS desktop: Sway with everything needed for daily use'
 arch=('any')
 url='https://github.com/getseverianos'
 license=('GPL-3.0-or-later')
 depends=(
     # SeverianOS
-    'severian-branding' 'severian-config' 'severian-tools' 'severian-browser'
+    'severian-keyring' 'severian-branding' 'severian-config' 'severian-tools' 'severian-browser'
     # Desktop
     'sway' 'swaybg' 'swayidle' 'swaylock' 'xorg-xwayland' 'xdg-desktop-portal-wlr' 'polkit' 'polkit-gnome'
     'waybar' 'foot' 'fuzzel' 'mako' 'grim' 'slurp' 'wl-clipboard' 'brightnessctl'

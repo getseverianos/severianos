@@ -1,7 +1,7 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-installer
 pkgver=0.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc='sevinstall – the SeverianOS installer (live medium only)'
 arch=('any')
 url='https://github.com/getseverianos'
@@ -17,5 +17,8 @@ package() {
     chmod 755 "$pkgdir/usr/bin/sevinstall"
     # Public repo URL, filled in by build.sh from config.sh (empty = not published yet)
     install -d "$pkgdir/usr/share/severian"
-    printf 'REPO_URL=%q\n' "${SEVERIAN_REPO_URL:-}" > "$pkgdir/usr/share/severian/installer.conf"
+    {
+        printf 'REPO_URL=%q\n' "${SEVERIAN_REPO_URL:-}"
+        printf 'REPO_SIGLEVEL=%q\n' "${SEVERIAN_REPO_SIGLEVEL:-Optional TrustAll}"
+    } > "$pkgdir/usr/share/severian/installer.conf"
 }
