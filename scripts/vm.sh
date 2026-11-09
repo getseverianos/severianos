@@ -34,7 +34,7 @@ pkill -f "qemu-system-x86_64.*severian-vm" 2>/dev/null && sleep 1 || true
 
 # shellcheck disable=SC2054  # commas are part of qemu options
 args=(
-    -name severian-vm
+    -name severian-vm -no-quit
     -enable-kvm -machine q35 -cpu host -smp 2 -m 3072
     -device virtio-vga -display gtk
     -nic user,model=virtio-net-pci
