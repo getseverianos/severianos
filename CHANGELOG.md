@@ -37,4 +37,8 @@ First version of SeverianOS as a real distribution.
   `SigLevel = Required` for `[severian]`
 - `./build.sh publish` uploads the signed repo to
   github.com/getseverianos/packages (release `x86_64`)
+- sevfetch shows the SeverianOS release
+- Installer removes the sync databases of the live medium, so the first
+  update on the new system fetches a matching, signed database
+- First update delivered through the signed [severian] repo
 - Tested: QEMU/KVM, AMD A10-6700 (radeon)

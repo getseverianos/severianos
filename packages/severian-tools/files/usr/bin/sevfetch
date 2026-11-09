@@ -25,6 +25,7 @@ done
 read -r mt ma < <(awk '/MemTotal/{t=$2}/MemAvailable/{a=$2}END{print t,a}' /proc/meminfo)
 mem="$(( (mt-ma)/1024 )) / $(( mt/1024 )) MiB"
 host=$(cat /etc/hostname 2>/dev/null || uname -n)
+rel=$(pacman -Q severian-desktop 2>/dev/null | cut -d" " -f2)
 
 logo=(
 "${f}     ▄▄▀▀▀▀▄▄     "
@@ -35,7 +36,7 @@ logo=(
 )
 info=(
 "${e}${USER:-$(id -un)}${m}@${f}${host}"
-"${m}os       ${f}${os}"
+"${m}os       ${f}${os}${rel:+ ${m}${rel}}"
 "${m}kernel   ${f}${kernel}"
 "${m}uptime   ${f}${up}"
 "${m}packages ${f}${pkgs}"

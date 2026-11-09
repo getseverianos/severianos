@@ -109,6 +109,7 @@ iso() {
 
     step "Building the ISO (sudo)"
     sudo rm -rf "$WORK"
+    sudo rm -f /var/cache/pacman/pkg/severian-*   # stale copies with the same version
     mkdir -p "$OUT"
     local st
     set +e

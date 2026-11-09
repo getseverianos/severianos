@@ -1,7 +1,7 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-tools
 pkgver=0.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp'
 arch=('any')
 url='https://github.com/getseverianos'
