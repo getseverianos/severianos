@@ -104,7 +104,7 @@ iso() {
     cp "$ROOT/iso/pacman.conf" "$PROFILE/airootfs/etc/pacman.conf"
     printf '\n[severian]\nSigLevel = Optional TrustAll\nServer = file:///opt/severian/repo\n' >> "$PROFILE/airootfs/etc/pacman.conf"
     # Build time: mkarchiso installs from the repo on this machine
-    printf '\n[severian]\nSigLevel = Optional TrustAll\nServer = file://%s\n' "$REPO" >> "$PROFILE/pacman.conf"
+    printf '\n[severian]\nSigLevel = Never\nServer = file://%s\n' "$REPO" >> "$PROFILE/pacman.conf"
     ok "profile in $PROFILE"
 
     step "Building the ISO (sudo)"
