@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# sevosd — change volume or brightness and show it as a small bar (via mako)
+#   sevosd volume up|down|mute     sevosd mic mute     sevosd brightness up|down
+
+show() {  # $1 title, $2 value 0-100
+    notify-send -a sevosd -t 1200 \
+        -h string:x-canonical-private-synchronous:sevosd -h "int:value:$2" "$1" 2>/dev/null
+}
+
+case ${1:-}:${2:-} in
+    volume:up)   wpctl set-mute @DEFAULT_AUDIO_SINK@ 0; wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
+    volume:down) wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+    volume:mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+    mic:mute)    wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
+    brightness:up)   brightnessctl -q set 5%+ ;;
+    brightness:down) brightnessctl -q set 5%- ;;
+    *) echo "usage: sevosd volume up|down|mute | mic mute | brightness up|down" >&2; exit 1 ;;
+esac
+
+case $1 in
+    volume|mic)
+        dev=@DEFAULT_AUDIO_SINK@; name=volume
+        [[ $1 == mic ]] && { dev=@DEFAULT_AUDIO_SOURCE@; name=microphone; }
+        read -r _ v rest < <(wpctl get-volume "$dev")
+        pct=$(awk -v v="$v" 'BEGIN {printf "%d", v * 100 + 0.5}')
+        if [[ $rest == *MUTED* ]]; then show "$name muted" 0; else show "$name $pct%" "$pct"; fi ;;
+    brightness)
+        pct=$(brightnessctl -m | awk -F, '{gsub("%", "", $4); print $4}')
+        show "brightness $pct%" "$pct" ;;
+esac
+pkill -RTMIN+8 waybar 2>/dev/null || true

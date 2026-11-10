@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Packages
+Comment=Find, install and remove software
+Exec=sevpkg
+Icon=system-software-install
+Terminal=false
+Categories=Settings;System;
+Keywords=software;install;packages;apps;

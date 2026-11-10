@@ -15,11 +15,12 @@ say() { notify-send -a SeverianOS "Settings" "$1" 2>/dev/null || echo "$1"; }
 term() { exec foot --app-id sev-float -W 80x24 "$@"; }
 has() { command -v "$1" >/dev/null; }
 
-# remember one sway line under a key, apply it now
+# remember one sway line under a key, apply it now.
+# sway allows comments only on their own line, so the key sits above it.
 persist() {  # $1 key, $2 sway command
     mkdir -p "$SWAYD"; touch "$SWAYF"
-    sed -i "/# sev:$1\$/d" "$SWAYF"
-    echo "$2 # sev:$1" >>"$SWAYF"
+    sed -i -e "/^# sev:$1\$/,+1d" -e "/ # sev:$1\$/d" "$SWAYF"
+    printf '# sev:%s\n%s\n' "$1" "$2" >>"$SWAYF"
     swaymsg "$2" >/dev/null
 }
 
@@ -48,25 +49,7 @@ sound() {
     [[ -n $id ]] && wpctl set-default "$id" && say "default: ${line#*. }"
 }
 
-display() {
-    local out mode scale
-    out=$(swaymsg -t get_outputs -r | jq -r '.[] | "\(.name)  \(.make) \(.model)"' | pick Display) || return
-    out=${out%% *}
-    case $(printf '%s\n' Resolution Scale Rotate "Turn off" "Turn on" | pick "$out") in
-        Resolution)
-            mode=$(swaymsg -t get_outputs -r | jq -r --arg o "$out" \
-                '.[] | select(.name==$o) | .modes[] | "\(.width)x\(.height)@\(.refresh/1000)Hz"' | sort -urV | pick Mode) || return
-            persist "mode-$out" "output $out mode $mode" ;;
-        Scale)
-            scale=$(printf '%s\n' 1 1.25 1.5 1.75 2 | pick Scale) || return
-            persist "scale-$out" "output $out scale $scale" ;;
-        Rotate)
-            local r; r=$(printf '%s\n' normal 90 180 270 | pick Rotate) || return
-            persist "rot-$out" "output $out transform $r" ;;
-        "Turn off") persist "power-$out" "output $out power off" ;;
-        "Turn on")  persist "power-$out" "output $out power on" ;;
-    esac
-}
+display() { exec sevdisplay; }
 
 keyboard() { exec sevkeyboard; }
 
@@ -114,6 +97,19 @@ defaults() {
     say "$kind: ${app%.desktop}"
 }
 
+night() {
+    local m
+    m=$(printf '%s\n' "auto (20:00–07:00)" always off | pick "Night light") || return
+    sevnight "${m%% *}"
+}
+
+clipboard() {
+    case $(printf '%s\n' "show history" "clear history" | pick Clipboard) in
+        "show history")  exec sevclip ;;
+        "clear history") cliphist wipe && say "clipboard history cleared" ;;
+    esac
+}
+
 mascot() {
     case $(printf '%s\n' on off | pick "Ember mascot") in
         on)  sev mascot on  >/dev/null; say "the ember is back" ;;
@@ -129,10 +125,11 @@ reset() {
 }
 
 # --- main ----------------------------------------------------------------
-sections=(network bluetooth sound display keyboard touchpad power "default apps" ember update about reset)
+sections=(network bluetooth sound display "night light" keyboard touchpad power clipboard packages "default apps" ember update about reset)
 choice=$(printf '%s\n' "${sections[@]}" | pick settings) || exit 0
 case $choice in
     network) network ;; bluetooth) bluetooth ;; sound) sound ;; display) display ;;
+    "night light") night ;; clipboard) clipboard ;; packages) exec sevpkg ;;
     keyboard) keyboard ;; touchpad) touchpad ;; power) power ;; "default apps") defaults ;;
     ember) mascot ;; update) exec foot --app-id sevupdate sevupdate --wait ;;
     about) about ;; reset) reset ;;

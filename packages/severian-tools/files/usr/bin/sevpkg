@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# sevpkg — find, install and remove packages (pacman)
+#   sevpkg                 menu (search all · installed)
+#   sevpkg search WORD     search names and descriptions
+#   sevpkg install PKG…    install
+#   sevpkg remove PKG…     remove (with unused dependencies)
+#   sevpkg info PKG        details
+#   sevpkg list            packages you installed yourself
+set -uo pipefail
+
+e=$'\e[38;2;181;82;59m' b=$'\e[38;2;201;166;107m' m=$'\e[38;2;111;106;98m' r=$'\e[0m'
+pick() { fuzzel --dmenu --prompt "● $1  " --lines 15 --width 80; }
+in_term() { exec foot --app-id sevpkg -W 100x30 "$0" "$@"; }
+
+# one line per package: name  version  [installed]  — description
+all_lines() {
+    pacman -Ss 2>/dev/null | awk '
+        /^[^ ]/ { split($1, a, "/"); n=a[2]; v=$2; i=($0 ~ /\[installed/) ? "  ✓" : ""; next }
+        { sub(/^ +/, ""); printf "%-32s %-18s%s  — %s\n", n, v, i, $0 }'
+}
+own_lines() {
+    pacman -Qei 2>/dev/null | awk -F': ' '
+        /^Name/ {n=$2} /^Version/ {v=$2}
+        /^Description/ {printf "%-32s %-18s — %s\n", n, v, $2}'
+}
+
+confirm() { local a; read -rp "  $1 [y/N] " a; [[ $a == [yY]* ]]; }
+done_key() { printf '\n  %spress any key to close%s' "$m" "$r"; read -rsn1; echo; }
+
+info() { pacman -Qi "$1" 2>/dev/null || pacman -Si "$1"; }
+
+install_one() {
+    local p=$1
+    printf '\n  %s●%s %s\n\n' "$e" "$r" "$p"
+    pacman -Si "$p" 2>/dev/null | grep -E '^(Description|Version|Repository|Download Size|Installed Size|Depends On)' | sed 's/^/  /'
+    echo
+    if pacman -Q "$p" >/dev/null 2>&1; then
+        printf '  %sinstalled%s\n' "$b" "$r"
+        confirm "remove $p?" && sudo pacman -Rns "$p"
+    else
+        confirm "install $p?" && sudo pacman -S --needed "$p"
+    fi
+    pkill -RTMIN+8 waybar 2>/dev/null || true
+}
+
+menu() {
+    local c line
+    c=$(printf '%s\n' "search all packages" "installed by you" | pick Packages) || exit 0
+    case $c in
+        search*)    line=$(all_lines | pick Search) || exit 0 ;;
+        installed*) line=$(own_lines | pick Installed) || exit 0 ;;
+    esac
+    in_term _pick "${line%% *}"
+}
+
+case ${1:-} in
+    "")       menu ;;
+    _pick)    install_one "$2"; done_key ;;
+    search)   shift; pacman -Ss "$@" ;;
+    install)  shift; sudo pacman -S --needed "$@" ;;
+    remove)   shift; sudo pacman -Rns "$@" ;;
+    info)     shift; info "$1" ;;
+    list)     own_lines ;;
+    -h|--help) sed -n '2,8s/^# \{0,1\}//p' "$0" ;;
+    *)        sed -n '2,8s/^# \{0,1\}//p' "$0"; exit 1 ;;
+esac

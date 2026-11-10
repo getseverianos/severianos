@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# sevnight — warmer screen colours at night (wlsunset)
+#   sevnight auto      warm from 20:00 to 07:00
+#   sevnight always    warm all the time
+#   sevnight off
+#   sevnight toggle    off <-> the last mode (default auto)
+#   sevnight restore   start the saved mode (run by sway at login)
+
+CONF=${XDG_CONFIG_HOME:-$HOME/.config}/sev/settings
+WARM=4000
+
+get() { sed -n "s/^$1=//p" "$CONF" 2>/dev/null | tail -n1; }
+set_() { mkdir -p "${CONF%/*}"; touch "$CONF"; sed -i "/^$1=/d" "$CONF"; echo "$1=$2" >>"$CONF"; }
+
+start() {
+    pkill -x wlsunset 2>/dev/null
+    command -v wlsunset >/dev/null || { notify-send -a SeverianOS "Night light" "wlsunset is not installed"; exit 1; }
+    case $1 in
+        auto)   setsid -f wlsunset -t "$WARM" -T 6500 -S 07:00 -s 20:00 >/dev/null 2>&1 ;;
+        always) setsid -f wlsunset -t "$WARM" -T $((WARM + 1)) >/dev/null 2>&1 ;;
+    esac
+}
+
+mode=${1:-toggle}
+case $mode in
+    toggle)
+        if [[ $(get night) == off || -z $(get night) ]]; then mode=$(get night_last); mode=${mode:-auto}
+        else mode=off; fi ;;
+    restore)
+        m=$(get night); [[ $m == auto || $m == always ]] && start "$m"
+        exit 0 ;;
+esac
+
+case $mode in
+    auto|always) start "$mode"; set_ night "$mode"; set_ night_last "$mode"
+                 notify-send -a SeverianOS -t 2000 "Night light" "$mode" ;;
+    off)         pkill -x wlsunset 2>/dev/null; set_ night off
+                 notify-send -a SeverianOS -t 2000 "Night light" "off" ;;
+    *) echo "usage: sevnight auto|always|off|toggle|restore" >&2; exit 1 ;;
+esac

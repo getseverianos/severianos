@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# sevclip — pick an earlier clipboard entry (history kept by cliphist)
+#   sevclip          choose and copy
+#   sevclip clear    forget the history
+
+command -v cliphist >/dev/null || { notify-send -a SeverianOS "Clipboard" "cliphist is not installed"; exit 1; }
+
+if [[ ${1:-} == clear ]]; then
+    cliphist wipe
+    notify-send -a SeverianOS "Clipboard" "history cleared"
+    exit 0
+fi
+
+pick=$(cliphist list | fuzzel --dmenu --prompt '● clipboard  ' --width 60 --lines 12) || exit 0
+cliphist decode <<<"$pick" | wl-copy

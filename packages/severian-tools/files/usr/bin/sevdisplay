@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# sevdisplay — screens: arrange, resolution, scale, rotate, on/off,
+# saved profiles and what happens when the laptop lid closes.
+# Changes are kept in ~/.config/sway/config.d/90-sevsettings.conf,
+# profiles in ~/.config/sev/displays/.
+set -uo pipefail
+
+SWAYD=${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d
+SWAYF=$SWAYD/90-sevsettings.conf
+PROF=${XDG_CONFIG_HOME:-$HOME/.config}/sev/displays
+
+pick() { fuzzel --dmenu --prompt "● $1  " --lines 12 --width 44; }
+say() { notify-send -a SeverianOS "Displays" "$1" 2>/dev/null || echo "$1"; }
+outputs() { swaymsg -t get_outputs -r; }
+
+persist() {  # $1 key, $2 sway command (key on its own comment line)
+    mkdir -p "$SWAYD"; touch "$SWAYF"
+    sed -i -e "/^# sev:$1\$/,+1d" -e "/ # sev:$1\$/d" "$SWAYF"
+    printf '# sev:%s\n%s\n' "$1" "$2" >>"$SWAYF"
+    swaymsg "$2" >/dev/null
+}
+forget() {  # remove every saved line whose key starts with $1
+    [[ -f $SWAYF ]] && sed -i -e "/^# sev:$1/,+1d" "$SWAYF"
+}
+
+choose_output() {  # $1 prompt
+    local o
+    o=$(outputs | jq -r '.[] | "\(.name)  \(.make) \(.model)\(if .active then "" else "  (off)" end)"' | pick "$1") || return 1
+    echo "${o%% *}"
+}
+rect() { outputs | jq -r --arg o "$1" '.[] | select(.name==$o) | "\(.rect.width) \(.rect.height)"'; }
+internal() { outputs | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) | .name' | head -n1; }
+
+# --- sections ------------------------------------------------------------
+arrange() {
+    local a b where aw ah bw bh
+    [[ $(outputs | jq '[.[] | select(.active)] | length') -ge 2 ]] || { say "only one screen is connected"; return; }
+    a=$(choose_output "Move screen") || return
+    b=$(outputs | jq -r --arg a "$a" '.[] | select(.active and .name != $a) | .name' | pick "…next to") || return
+    where=$(printf '%s\n' "left of $b" "right of $b" "above $b" "below $b" | pick "$a is") || return
+    read -r aw ah < <(rect "$a"); read -r bw bh < <(rect "$b")
+    case ${where%% *} in
+        left)  persist "out-$a-pos" "output $a pos 0 0";   persist "out-$b-pos" "output $b pos $aw 0" ;;
+        right) persist "out-$b-pos" "output $b pos 0 0";   persist "out-$a-pos" "output $a pos $bw 0" ;;
+        above) persist "out-$a-pos" "output $a pos 0 0";   persist "out-$b-pos" "output $b pos 0 $ah" ;;
+        below) persist "out-$b-pos" "output $b pos 0 0";   persist "out-$a-pos" "output $a pos 0 $bh" ;;
+    esac
+    say "$a is $where"
+}
+
+resolution() {
+    local o m
+    o=$(choose_output Screen) || return
+    m=$(outputs | jq -r --arg o "$o" '.[] | select(.name==$o) | .modes[] |
+        "\(.width)x\(.height)@\((.refresh/1000*1000|round)/1000)Hz"' | sort -urV | pick Resolution) || return
+    persist "out-$o-mode" "output $o mode $m"
+}
+
+scale() {
+    local o s
+    o=$(choose_output Screen) || return
+    s=$(printf '%s\n' 1 1.25 1.5 1.75 2 | pick Scale) || return
+    persist "out-$o-scale" "output $o scale $s"
+}
+
+rotate() {
+    local o r
+    o=$(choose_output Screen) || return
+    r=$(printf '%s\n' normal 90 180 270 | pick Rotate) || return
+    persist "out-$o-transform" "output $o transform $r"
+}
+
+power() {
+    local o
+    o=$(choose_output Screen) || return
+    case $(printf '%s\n' "turn on" "turn off" | pick "$o") in
+        "turn on")  persist "out-$o-power" "output $o enable" ;;
+        "turn off")
+            [[ $(outputs | jq '[.[] | select(.active)] | length') -ge 2 ]] || { say "can't turn off the only screen"; return; }
+            persist "out-$o-power" "output $o disable" ;;
+    esac
+}
+
+lid() {
+    local i
+    i=$(internal); [[ -n $i ]] || { say "no laptop screen found"; return; }
+    case $(printf '%s\n' "turn the laptop screen off when the lid closes" "default (suspend when no other screen)" | pick "Lid") in
+        turn*)
+            persist lid-on  "bindswitch --reload --locked lid:on output $i disable"
+            persist lid-off "bindswitch --reload --locked lid:off output $i enable"
+            say "lid closed → $i off" ;;
+        default*)
+            forget lid-; swaymsg "unbindswitch lid:on" >/dev/null 2>&1; swaymsg "unbindswitch lid:off" >/dev/null 2>&1
+            swaymsg "output $i enable" >/dev/null; say "lid: default" ;;
+    esac
+}
+
+profile_line() {  # current state of all outputs, one sway command each
+    outputs | jq -r '.[] | if .active then
+        "output \(.name) enable mode \(.current_mode.width)x\(.current_mode.height)@\((.current_mode.refresh/1000*1000|round)/1000)Hz pos \(.rect.x) \(.rect.y) scale \(.scale) transform \(.transform)"
+        else "output \(.name) disable" end'
+}
+
+profiles() {
+    local p name l
+    mkdir -p "$PROF"
+    p=$(
+        printf '%s\n' "save current layout…"
+        for f in "$PROF"/*.conf; do [[ -e $f ]] && { n=${f##*/}; echo "load ${n%.conf}"; }; done
+        for f in "$PROF"/*.conf; do [[ -e $f ]] && { n=${f##*/}; echo "delete ${n%.conf}"; }; done
+    ) ; p=$(pick Profiles <<<"$p") || return
+    case $p in
+        save*)
+            name=$(printf '%s\n' home work docked laptop | pick "Name (or type one)") || return
+            name=${name//[^a-zA-Z0-9_-]/}; [[ -n $name ]] || return
+            profile_line > "$PROF/$name.conf"; say "saved profile $name" ;;
+        load\ *)
+            name=${p#load }
+            forget out-
+            while read -r l; do
+                [[ -n $l ]] || continue
+                o=$(awk '{print $2}' <<<"$l")
+                persist "out-$o-profile" "$l"
+            done < "$PROF/$name.conf"
+            say "profile $name" ;;
+        delete\ *)
+            rm -f "$PROF/${p#delete }.conf"; say "deleted ${p#delete }" ;;
+    esac
+}
+
+identify() {
+    local o
+    while read -r o; do
+        notify-send -a SeverianOS -t 3000 "$o" "$(outputs | jq -r --arg o "$o" '.[] | select(.name==$o) |
+            "\(.make) \(.model)\n\(.current_mode.width)x\(.current_mode.height) · scale \(.scale)"')"
+    done < <(outputs | jq -r '.[] | select(.active) | .name')
+}
+
+# --- main ----------------------------------------------------------------
+c=$(printf '%s\n' arrange resolution scale rotate "on / off" profiles "laptop lid" "show screens" | pick Displays) || exit 0
+case $c in
+    arrange) arrange ;; resolution) resolution ;; scale) scale ;; rotate) rotate ;;
+    "on / off") power ;; profiles) profiles ;; "laptop lid") lid ;; "show screens") identify ;;
+esac

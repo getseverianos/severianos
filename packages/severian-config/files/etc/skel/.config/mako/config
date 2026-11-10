@@ -20,3 +20,9 @@ default-timeout=0
 
 [app-name=SeverianOS]
 default-timeout=12000
+
+[app-name=sevosd]
+format=%s
+border-color=#2a292e
+progress-color=over #b5523b
+default-timeout=1200

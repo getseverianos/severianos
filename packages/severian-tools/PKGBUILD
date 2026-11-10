@@ -1,8 +1,8 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-tools
 pkgver=0.1.0
-pkgrel=7
-pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp, sevbattery, sevshot, sev, sevsettings'
+pkgrel=8
+pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp, sevbattery, sevshot, sev, sevsettings, sevdisplay, sevpkg, sevosd, sevclip, sevnight, sevrec'
 arch=('any')
 url='https://github.com/getseverianos'
 license=('GPL-3.0-or-later')
@@ -13,7 +13,11 @@ optdepends=('sway: severian-session, sevkeyboard, sevpower'
             'swaylock: lock from sevpower'
             'foot: terminal pages of sev and sevsettings'
             'networkmanager: network page of sevsettings'
-            'bluetui: bluetooth page of sevsettings')
+            'bluetui: bluetooth page of sevsettings'
+            'cliphist: clipboard history (sevclip)'
+            'wlsunset: night light (sevnight)'
+            'wf-recorder: screen recording (sevrec)'
+            'brightnessctl: brightness (sevosd)')
 options=('!strip' '!debug')
 
 package() {

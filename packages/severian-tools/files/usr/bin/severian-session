@@ -15,4 +15,11 @@ if systemd-detect-virt -q --vm 2>/dev/null; then
     export WLR_NO_HARDWARE_CURSORS=1
 fi
 
+# sevsettings 0.2 wrote "command # sev:key" lines, which sway rejects;
+# move the key onto its own line before sway reads the file
+f=${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d/90-sevsettings.conf
+if [ -f "$f" ] && grep -q ' # sev:' "$f"; then
+    sed -i 's/^\(.*\) # sev:\(.*\)$/# sev:\2\n\1/' "$f"
+fi
+
 exec systemd-cat --identifier=sway sway "$@"

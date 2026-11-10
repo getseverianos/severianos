@@ -114,22 +114,30 @@ mode "resize" {
 bindsym $mod+r mode "resize"
 
 # ── Media, brightness, screenshots ────────────
-bindsym XF86AudioRaiseVolume exec wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
-bindsym XF86AudioLowerVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
-bindsym XF86AudioMute exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
-bindsym XF86AudioMicMute exec wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
-bindsym XF86MonBrightnessUp exec brightnessctl set 5%+
-bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
+bindsym --locked XF86AudioRaiseVolume exec sevosd volume up
+bindsym --locked XF86AudioLowerVolume exec sevosd volume down
+bindsym --locked XF86AudioMute exec sevosd volume mute
+bindsym --locked XF86AudioMicMute exec sevosd mic mute
+bindsym --locked XF86MonBrightnessUp exec sevosd brightness up
+bindsym --locked XF86MonBrightnessDown exec sevosd brightness down
 bindsym Print exec grim -g "$(slurp -b 12121499 -c b5523bff -w 2)" - | wl-copy
 bindsym Shift+Print exec grim - | wl-copy
 bindsym $mod+Print exec sevshot
 bindsym $mod+Shift+Print exec sevshot full
+bindsym $mod+Shift+r exec sevrec
+
+# ── Clipboard, night light, displays, packages ─
+bindsym $mod+Shift+v exec sevclip
+bindsym $mod+Shift+n exec sevnight toggle
+bindsym $mod+Shift+p exec sevdisplay
+bindsym $mod+Shift+a exec sevpkg
 
 # ── Window rules ──────────────────────────────
 for_window [app_id="sevhelp"] floating enable
 for_window [app_id="sevnet"] floating enable
 for_window [app_id="sevbt"] floating enable
 for_window [app_id="sev-float"] floating enable
+for_window [app_id="sevpkg"] floating enable, resize set 900 560
 for_window [app_id="polkit-gnome-authentication-agent-1"] floating enable
 for_window [app_id="sevupdate"] floating enable, resize set 900 600
 for_window [app_id="pavucontrol"] floating enable, resize set 720 480
@@ -147,6 +155,8 @@ exec sevidle
 exec /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 exec sevwelcome
 exec sevbattery
+exec wl-paste --watch cliphist store
+exec sevnight restore
 
 include /etc/sway/config.d/*
 include ~/.config/sway/config.d/*

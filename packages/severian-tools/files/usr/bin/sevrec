@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# sevrec — record the screen to ~/Videos/Recordings (wf-recorder)
+#   sevrec          start: select a region · stop if a recording runs
+#   sevrec full     start: whole screen
+#   sevrec audio    region, with sound from the speakers
+
+if pgrep -x wf-recorder >/dev/null; then
+    pkill -INT -x wf-recorder
+    file=$(cat "${XDG_RUNTIME_DIR:-/tmp}/sevrec" 2>/dev/null)
+    notify-send -a SeverianOS "Recording saved" "${file/#$HOME/\~}"
+    exit 0
+fi
+
+command -v wf-recorder >/dev/null || { notify-send -a SeverianOS "Recording" "wf-recorder is not installed"; exit 1; }
+
+dir=$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")/Recordings
+mkdir -p "$dir"
+file=$dir/$(date +%Y-%m-%d_%H-%M-%S).mp4
+args=(-f "$file")
+
+case ${1:-} in
+    full) ;;
+    audio|"")
+        region=$(slurp -b 12121499 -c b5523bff -w 2) || exit 0
+        args+=(-g "$region")
+        if [[ ${1:-} == audio ]]; then
+            sink=$(pactl get-default-sink 2>/dev/null)
+            args+=(--audio="${sink:+$sink.monitor}")
+        fi ;;
+    *) echo "usage: sevrec [full|audio]" >&2; exit 1 ;;
+esac
+
+echo "$file" > "${XDG_RUNTIME_DIR:-/tmp}/sevrec"
+notify-send -a SeverianOS -t 2500 "Recording" "stop with super + shift + r"
+setsid -f wf-recorder "${args[@]}" >/dev/null 2>&1

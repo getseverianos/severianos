@@ -9,6 +9,16 @@
   packages), `sev fix` (stale pacman lock), `sev mem` (where the memory goes),
   `sev info` (sevfetch)
 - Settings and System Check appear in the app launcher (Super+D)
+- On-screen bar for volume and brightness (sevosd, works on the lock screen)
+- Clipboard history: Super+Shift+V (sevclip, cliphist)
+- Night light: Super+Shift+N, auto 20:00–07:00 or always (sevnight, wlsunset)
+- Screen recording: Super+Shift+R starts and stops (sevrec, wf-recorder),
+  saved to ~/Videos/Recordings; `sevrec full`, `sevrec audio`
+- Displays: Super+Shift+P (sevdisplay) – arrange, resolution, scale, rotate,
+  on/off, saved profiles, laptop lid turns the internal screen off
+- Packages: Super+Shift+A (sevpkg) – search all packages, see what you
+  installed, install and remove; `sevpkg search WORD` in the terminal
+- Fix: settings saved by sevsettings no longer break the sway config
 - `sevsettings` (Super+Comma, middle click on the ember): one menu for network,
   Bluetooth, sound, displays, keyboard, touchpad, power profile, default apps,
   the ember, update, system info and reset

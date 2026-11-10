@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Displays
+Comment=Arrange screens, resolution, profiles
+Exec=sevdisplay
+Icon=video-display
+Terminal=false
+Categories=Settings;System;
+Keywords=display;monitor;screen;resolution;
