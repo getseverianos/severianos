@@ -1,0 +1,15 @@
+severian-sev
+
+sev            the ember: status, quick menu, short ways to the sev* tools
+sevsettings    one menu for everyday settings (fuzzel)
+
+Waybar: add the block from waybar-module.jsonc and these styles:
+  #custom-sev         { color: #b5523b; }
+  #custom-sev.awake   { color: #c9a66b; }
+  #custom-sev.worried { color: #d06a50; }
+Refresh after an update: pkill -RTMIN+8 waybar
+
+Sway: settings are saved to ~/.config/sway/config.d/90-sevsettings.conf.
+The sway config needs:   include ~/.config/sway/config.d/*
+Floating terminal:       for_window [app_id="sev-float"] floating enable
+Keybinding (suggestion): bindsym $mod+comma exec sevsettings

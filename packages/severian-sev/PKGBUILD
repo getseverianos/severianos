@@ -1,0 +1,18 @@
+pkgname=severian-sev
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="SeverianOS ember mascot (sev) and settings menu (sevsettings)"
+arch=('any')
+url="https://github.com/getseverianos/severianos"
+license=('GPL-3.0-or-later')
+depends=('bash' 'sway' 'fuzzel' 'foot' 'jq' 'libnotify' 'wireplumber' 'xdg-utils')
+optdepends=('pacman-contrib: update count in sev'
+            'networkmanager: Wi-Fi settings via nmtui'
+            'iwd: Wi-Fi settings via iwctl'
+            'bluez-utils: Bluetooth settings'
+            'power-profiles-daemon: power profiles')
+
+package() {
+    cp -a "$startdir/files/." "$pkgdir/"
+    chmod 755 "$pkgdir/usr/bin/sev" "$pkgdir/usr/bin/sevsettings"
+}

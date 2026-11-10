@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# sevsettings - one menu for the everyday settings of SeverianOS.
+# Uses fuzzel for choices and foot for tools that need a terminal.
+# Settings that must survive a restart go to
+#   ~/.config/sway/config.d/90-sevsettings.conf
+set -uo pipefail
+
+SWAYD=${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d
+SWAYF=$SWAYD/90-sevsettings.conf
+
+pick() {  # $1 prompt, choices on stdin
+    fuzzel --dmenu --prompt "$1 › " --lines 12
+}
+say() { notify-send -a SeverianOS "Settings" "$1" 2>/dev/null || echo "$1"; }
+term() { exec foot --app-id sev-float -e "$@"; }
+has() { command -v "$1" >/dev/null; }
+
+# remember one sway line under a key, apply it now
+persist() {  # $1 key, $2 sway command
+    mkdir -p "$SWAYD"; touch "$SWAYF"
+    sed -i "/# sev:$1\$/d" "$SWAYF"
+    echo "$2 # sev:$1" >>"$SWAYF"
+    swaymsg "$2" >/dev/null
+}
+
+# --- sections ------------------------------------------------------------
+network() {
+    if has nmtui; then term nmtui
+    elif has iwctl; then term iwctl
+    else say "no network tool found"; fi
+}
+
+bluetooth() {
+    if has bluetui; then term bluetui
+    elif has bluetoothctl; then term bluetoothctl
+    else say "bluetooth tools not installed"; fi
+}
+
+sound() {
+    has wpctl || { say "wpctl (wireplumber) not found"; return; }
+    local sec sinks line id
+    sec=$(printf '%s\n' "Output device" "Input device" "Volume" | pick Sound) || return
+    case $sec in
+        Volume)
+            local v; v=$(printf '%s\n' 100 75 50 25 0 | pick "Volume %") || return
+            wpctl set-volume @DEFAULT_AUDIO_SINK@ "$v%"; return ;;
+        "Output device") sinks=Sinks ;;
+        "Input device")  sinks=Sources ;;
+    esac
+    line=$(wpctl status | awk -v s="$sinks:" '
+        /Audio/ {a=1} /Video/ {a=0}
+        a && $0 ~ s {on=1; next}
+        on && /^ *│ *$/ {exit}
+        on && /[0-9]+\./ {sub(/^[ │├└─*]+/,""); print}' | pick "$sec") || return
+    id=${line%%.*}; id=${id//[^0-9]/}
+    [[ -n $id ]] && wpctl set-default "$id" && say "default: ${line#*. }"
+}
+
+display() {
+    local out mode scale
+    out=$(swaymsg -t get_outputs -r | jq -r '.[] | "\(.name)  \(.make) \(.model)"' | pick Display) || return
+    out=${out%% *}
+    case $(printf '%s\n' Resolution Scale Rotate "Turn off" "Turn on" | pick "$out") in
+        Resolution)
+            mode=$(swaymsg -t get_outputs -r | jq -r --arg o "$out" \
+                '.[] | select(.name==$o) | .modes[] | "\(.width)x\(.height)@\(.refresh/1000)Hz"' | sort -urV | pick Mode) || return
+            persist "mode-$out" "output $out mode $mode" ;;
+        Scale)
+            scale=$(printf '%s\n' 1 1.25 1.5 1.75 2 | pick Scale) || return
+            persist "scale-$out" "output $out scale $scale" ;;
+        Rotate)
+            local r; r=$(printf '%s\n' normal 90 180 270 | pick Rotate) || return
+            persist "rot-$out" "output $out transform $r" ;;
+        "Turn off") persist "power-$out" "output $out power off" ;;
+        "Turn on")  persist "power-$out" "output $out power on" ;;
+    esac
+}
+
+keyboard() {
+    local l
+    l=$(localectl list-x11-keymap-layouts 2>/dev/null | pick "Keyboard layout") || return
+    persist kbd "input type:keyboard xkb_layout $l"
+    say "keyboard: $l"
+}
+
+touchpad() {
+    local c
+    c=$(printf '%s\n' "Tap to click on" "Tap to click off" "Natural scroll on" "Natural scroll off" | pick Touchpad) || return
+    case $c in
+        "Tap to click on")    persist tap "input type:touchpad tap enabled" ;;
+        "Tap to click off")   persist tap "input type:touchpad tap disabled" ;;
+        "Natural scroll on")  persist nat "input type:touchpad natural_scroll enabled" ;;
+        "Natural scroll off") persist nat "input type:touchpad natural_scroll disabled" ;;
+    esac
+}
+
+power() {
+    if has powerprofilesctl; then
+        local p; p=$(powerprofilesctl list | awk -F: '/^[ *]+[a-z-]+:$/ {gsub(/[ *]/,"",$1); print $1}' | pick "Power profile") || return
+        powerprofilesctl set "$p" && say "power: $p"
+    else
+        say "power-profiles-daemon is not installed"
+    fi
+}
+
+apps() {  # desktop files whose name matches $1
+    local f
+    for f in /usr/share/applications/*.desktop; do
+        [[ ${f##*/} =~ $1 ]] && echo "${f##*/}"
+    done
+}
+
+defaults() {
+    local kind app
+    shopt -s nocasematch
+    kind=$(printf '%s\n' "Web browser" "File manager" "Image viewer" "Video player" | pick "Default app") || return
+    case $kind in
+        "Web browser")  app=$(apps '(firefox|chrom|brave|qutebrowser|librewolf)' | pick Browser) || return
+                        xdg-settings set default-web-browser "$app" ;;
+        "File manager") app=$(apps '(thunar|nautilus|pcmanfm|dolphin|nemo)' | pick "File manager") || return
+                        xdg-mime default "$app" inode/directory ;;
+        "Image viewer") app=$(apps '(imv|eog|feh|gwenview|loupe)' | pick Images) || return
+                        xdg-mime default "$app" image/png image/jpeg image/webp image/gif ;;
+        "Video player") app=$(apps '(mpv|vlc|celluloid)' | pick Video) || return
+                        xdg-mime default "$app" video/mp4 video/x-matroska video/webm ;;
+    esac
+    say "$kind: ${app%.desktop}"
+}
+
+mascot() {
+    case $(printf '%s\n' on off | pick "Ember mascot") in
+        on)  sev mascot on  >/dev/null; say "the ember is back" ;;
+        off) sev mascot off >/dev/null; say "the ember rests" ;;
+    esac
+}
+
+about() { term bash -c 'sevfetch 2>/dev/null || sev; echo; read -rp "press Enter"'; }
+
+reset() {
+    [[ $(printf '%s\n' "No" "Yes, reset my config" | pick "Reset to SeverianOS defaults?") == Yes* ]] || return
+    term bash -c 'sevconfig reset; read -rp "done - press Enter"'
+}
+
+# --- main ----------------------------------------------------------------
+sections=(Network Bluetooth Sound Display Keyboard Touchpad Power "Default apps" Mascot Update About Reset)
+choice=$(printf '%s\n' "${sections[@]}" | pick Settings) || exit 0
+case $choice in
+    Network) network ;; Bluetooth) bluetooth ;; Sound) sound ;; Display) display ;;
+    Keyboard) keyboard ;; Touchpad) touchpad ;; Power) power ;; "Default apps") defaults ;;
+    Mascot) mascot ;; Update) term bash -c 'sev update; read -rp "done - press Enter"' ;;
+    About) about ;; Reset) reset ;;
+esac

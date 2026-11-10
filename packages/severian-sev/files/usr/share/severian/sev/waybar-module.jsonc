@@ -1,0 +1,10 @@
+// SeverianOS ember. Put "custom/sev" first in modules-left.
+"custom/sev": {
+    "exec": "sev waybar",
+    "return-type": "json",
+    "interval": 600,
+    "on-click": "fuzzel",
+    "on-click-right": "sev menu",
+    "on-click-middle": "sevsettings",
+    "signal": 8
+}
