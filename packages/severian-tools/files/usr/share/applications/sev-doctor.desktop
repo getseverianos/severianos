@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=System Check
+GenericName=sev doctor
+Comment=Check SeverianOS for problems
+Exec=foot --app-id sev-float -W 80x26 sh -c 'sev doctor; read -rsn1'
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;
+Keywords=doctor;check;health;problems;

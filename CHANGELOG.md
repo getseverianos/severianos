@@ -5,6 +5,10 @@
 - The ember: `sev` shows how the system is doing (failed services, full disk,
   pending updates) as a small mascot; `sev menu` / right click on the ember in
   Waybar opens settings, update, doctor, keys and power; `sev mascot off`
+- `sev doctor` (system check), `sev clean` (package cache, old logs, unused
+  packages), `sev fix` (stale pacman lock), `sev mem` (where the memory goes),
+  `sev info` (sevfetch)
+- Settings and System Check appear in the app launcher (Super+D)
 - `sevsettings` (Super+Comma, middle click on the ember): one menu for network,
   Bluetooth, sound, displays, keyboard, touchpad, power profile, default apps,
   the ember, update, system info and reset

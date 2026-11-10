@@ -4,14 +4,20 @@
 set -uo pipefail
 
 CONF=${XDG_CONFIG_HOME:-$HOME/.config}/sev/settings
+PROMISE_MIB=572   # 600 MB after login, see README
 MASCOT=1
 if [[ -f $CONF ]] && grep -qx 'mascot=off' "$CONF"; then MASCOT=0; fi
 
 if [[ -t 1 ]]; then
-    E=$'\e[38;2;181;82;59m' B=$'\e[38;2;201;166;107m' M=$'\e[38;2;111;106;98m' R=$'\e[0m'
+    E=$'\e[38;2;181;82;59m' B=$'\e[38;2;201;166;107m' G=$'\e[38;2;127;154;101m'
+    M=$'\e[38;2;111;106;98m' R=$'\e[0m'
 else
-    E='' B='' M='' R=''
+    E='' B='' G='' M='' R=''
 fi
+good() { printf '  %s✓%s %s\n' "$G" "$R" "$*"; }
+warn() { printf '  %s!%s %s\n' "$B" "$R" "$*"; }
+hint() { printf '    %s%s%s\n' "$M" "$*" "$R"; }
+head_() { printf '\n  %s●%s %s\n\n' "$E" "$R" "$*"; }
 
 # --- state -------------------------------------------------------------
 failed_units() {
@@ -21,24 +27,26 @@ failed_units() {
 root_use() { df --output=pcent / 2>/dev/null | tail -n1 | tr -dc 0-9; }
 update_count() {
     command -v checkupdates >/dev/null || { echo "?"; return; }
-    local n
-    n=$(checkupdates 2>/dev/null | wc -l) || n=0
-    echo "$n"
+    checkupdates 2>/dev/null | wc -l
 }
+mem_used() { free -m | awk '/^Mem:/ {print $3}'; }
 
-# mood: calm | awake | worried, plus one line of text
+# mood: calm | awake | worried, plus lines of text in MSG
 mood() {
     local failed use upd
     failed=$(failed_units | wc -l)
     use=$(root_use); use=${use:-0}
-    upd=$(update_count)
+    upd=${1:-$(update_count)}
     MSG=()
     MOOD=calm
-    if ((failed > 0)); then MOOD=worried; MSG+=("$failed failed service(s) - run: sev doctor"); fi
-    if ((use >= 90)); then MOOD=worried; MSG+=("disk ${use}% full"); fi
+    if ((failed > 0)); then MOOD=worried; MSG+=("$failed failed service(s) - sev doctor"); fi
+    if ((use >= 90)); then MOOD=worried; MSG+=("disk ${use}% full - sev clean"); fi
+    if [[ -e /var/lib/pacman/db.lck ]] && ! pgrep -x pacman >/dev/null; then
+        MOOD=worried; MSG+=("stale pacman lock - sev fix")
+    fi
     if [[ $upd =~ ^[0-9]+$ ]] && ((upd > 0)); then
         [[ $MOOD == calm ]] && MOOD=awake
-        MSG+=("$upd update(s) ready - run: sev update")
+        MSG+=("$upd update(s) ready - sev update")
     fi
     ((${#MSG[@]})) || MSG=("all quiet. the old sun still burns.")
 }
@@ -49,6 +57,7 @@ face() {
         awake)   echo "o  o" ;;
         worried) echo "°  °" ;;
         happy)   echo "^  ^" ;;
+        sleepy)  echo "u  u" ;;
     esac
 }
 
@@ -59,37 +68,131 @@ draw() {  # $1 mood, rest = lines of text
         printf '%s     .  %s\n' "$E" "$R"
         printf '%s   .(%s)  %s%s\n' "$E" "$f" "$R" "${1:-}"
         printf '%s    (____)  %s%s\n' "$E" "$R" "${2:-}"
-        printf '%s  ‾‾‾‾‾‾‾‾‾‾%s %s%s\n' "$B" "$R" "$M" "${3:-}$R"
+        printf '%s  ‾‾‾‾‾‾‾‾‾‾%s %s%s%s\n' "$B" "$R" "$M" "${3:-}" "$R"
         shift 3 2>/dev/null || shift $#
     fi
-    for l in "$@"; do echo "$l"; done
+    for l in "$@"; do echo "  $l"; done
 }
 
 status() {
     mood
     local up
     up=$(uptime -p 2>/dev/null | sed 's/^up //')
-    draw "$MOOD" "${MSG[@]:0:2}" "up ${up:-?}" "${MSG[@]:2}"
+    draw "$MOOD" "${MSG[@]:0:2}" "up ${up:-?} · ram $(mem_used) MiB · disk $(root_use)%" "${MSG[@]:2}"
 }
 
 # --- waybar --------------------------------------------------------------
 json_escape() { local s=$1; s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\n'/\\n}; printf '%s' "$s"; }
-waybar() {
+waybar_json() {
     mood
     local tip
-    tip=$(printf '%s\n' "${MSG[@]}")
+    tip=$(printf '%s\n' "${MSG[@]}" "" "right click: menu · middle: settings")
     printf '{"text":"●","class":"%s","tooltip":"%s"}\n' "$MOOD" "$(json_escape "$tip")"
+}
+
+# --- doctor --------------------------------------------------------------
+doctor() {
+    local u n pn use mem orph cache
+    head_ "sev doctor"
+
+    u=$(failed_units)
+    if [[ -n $u ]]; then
+        warn "failed services:"; while read -r n; do hint "$n   (journalctl -b -u $n)"; done <<<"$u"
+    else good "all services running"; fi
+
+    use=$(root_use)
+    if ((use >= 90)); then warn "disk ${use}% full"; hint "sev clean frees package cache and old logs"
+    else good "disk ${use}% used"; fi
+
+    mem=$(mem_used)
+    if ((mem > PROMISE_MIB)); then warn "ram ${mem} MiB used (SeverianOS aims for < $PROMISE_MIB MiB after login)"; hint "sev mem shows where it goes"
+    else good "ram ${mem} MiB used"; fi
+
+    if [[ -e /var/lib/pacman/db.lck ]] && ! pgrep -x pacman >/dev/null; then
+        warn "stale pacman lock (an update was interrupted)"; hint "sev fix removes it"
+    else good "pacman ready"; fi
+
+    pn=$(find /etc -name '*.pacnew' 2>/dev/null)
+    if [[ -n $pn ]]; then
+        warn "config files to merge (.pacnew):"; sed 's/^/      /' <<<"$pn"
+        hint "compare: diff FILE FILE.pacnew"
+    else good "no .pacnew files"; fi
+
+    orph=$(pacman -Qdtq 2>/dev/null | wc -l)
+    if ((orph > 0)); then warn "$orph unused package(s)"; hint "sev clean can remove them"
+    else good "no unused packages"; fi
+
+    cache=$(du -sm /var/cache/pacman/pkg 2>/dev/null | cut -f1); cache=${cache:-0}
+    if ((cache > 2048)); then warn "package cache ${cache} MiB"; hint "sev clean keeps the last 2 versions"
+    else good "package cache ${cache} MiB"; fi
+
+    n=$(journalctl -b -p 3 -q --no-pager 2>/dev/null | wc -l)
+    if ((n > 0)); then warn "$n error line(s) in the log since boot"; hint "journalctl -b -p 3"
+    else good "no errors in the log since boot"; fi
+
+    if [[ -e /usr/lib/modules/$(uname -r) ]]; then good "running the installed kernel"
+    else warn "a new kernel is installed"; hint "reboot when convenient"; fi
+    echo
+}
+
+# --- clean ---------------------------------------------------------------
+clean() {
+    local orph
+    head_ "sev clean"
+    echo "  package cache: keep the last 2 versions"
+    sudo paccache -rk2 -q || true
+    sudo paccache -ruk0 -q || true
+    echo "  logs: keep the last 2 weeks"
+    sudo journalctl --vacuum-time=2weeks -q || true
+    mapfile -t orph < <(pacman -Qdtq 2>/dev/null)
+    if ((${#orph[@]})); then
+        echo "  unused packages: ${orph[*]}"
+        read -rp "  remove them? [y/N] " a
+        [[ $a == [yY]* ]] && sudo pacman -Rns --noconfirm "${orph[@]}"
+    fi
+    good "done - disk $(root_use)% used"
+    echo
+}
+
+# --- fix -----------------------------------------------------------------
+fix() {
+    head_ "sev fix"
+    if [[ -e /var/lib/pacman/db.lck ]]; then
+        if pgrep -x pacman >/dev/null; then
+            warn "pacman is running - wait for it to finish"
+        else
+            sudo rm -f /var/lib/pacman/db.lck && good "removed the stale pacman lock"
+        fi
+    else
+        good "nothing to fix"
+    fi
+    echo
+}
+
+# --- mem -----------------------------------------------------------------
+mem() {
+    head_ "sev mem"
+    free -m | awk '/^Mem:/ {printf "  used %s MiB · cache %s MiB · available %s MiB\n", $3, $6, $7}'
+    echo
+    echo "  programs:"
+    ps -eo rss=,comm= --sort=-rss | head -12 | awk '{printf "    %5.0f MiB  %s\n", $1/1024, $2}'
+    echo
+    echo "  kernel:"
+    awk '/^(Slab|SUnreclaim|KernelStack|PageTables|Shmem|Percpu|VmallocUsed):/ {printf "    %5.0f MiB  %s\n", $2/1024, $1}' /proc/meminfo
+    echo
 }
 
 # --- menu ----------------------------------------------------------------
 menu() {
     local pick
-    pick=$(printf '%s\n' settings update doctor keys power |
-        fuzzel --dmenu --prompt '● ' --lines 5 --width 16) || exit 0
+    pick=$(printf '%s\n' settings update doctor clean info keys power |
+        fuzzel --dmenu --prompt '● ' --lines 7 --width 16) || exit 0
     case $pick in
         settings) exec sevsettings ;;
         update)   exec foot --app-id sevupdate sevupdate --wait ;;
-        doctor)   exec foot --app-id sev-float -W 80x24 sh -c 'sev doctor; read -rsn1' ;;
+        doctor)   exec foot --app-id sev-float -W 80x26 sh -c 'sev doctor; read -rsn1' ;;
+        clean)    exec foot --app-id sev-float -W 80x20 sh -c 'sev clean; read -rsn1' ;;
+        info)     exec foot --app-id sev-float -W 80x16 sh -c 'sevfetch; read -rsn1' ;;
         keys)     exec foot --app-id sevhelp -W 64x32 sh -c 'sevhelp; read -rsn1' ;;
         power)    exec sevpower ;;
     esac
@@ -97,26 +200,19 @@ menu() {
 
 run_or_say() { if command -v "$1" >/dev/null; then exec "$@"; else echo "sev: $1 is not installed" >&2; exit 1; fi; }
 
-doctor() {
-    if command -v sevdoctor >/dev/null; then exec sevdoctor "$@"; fi
-    mood
-    draw "$MOOD" "${MSG[@]}"
-    local u; u=$(failed_units)
-    [[ -n $u ]] && { echo; echo "failed:"; sed 's/^/  /' <<<"$u"; }
-    local pn; pn=$(find /etc -name '*.pacnew' 2>/dev/null)
-    [[ -n $pn ]] && { echo; echo ".pacnew files to merge:"; sed 's/^/  /' <<<"$pn"; }
-    return 0
-}
-
 usage() {
     cat <<EOF
 usage: sev [command]
   (none)     how the system is doing
-  update     update the system (sevupdate)
-  doctor     look for problems
-  settings   open the settings menu
-  help       key bindings (sevhelp)
-  menu       quick menu (also: right click on the ember in waybar)
+  info       system info (sevfetch)
+  update     update the system
+  doctor     check the system for problems
+  clean      free disk space (package cache, old logs, unused packages)
+  fix        repair common problems (stale pacman lock)
+  mem        where the memory goes
+  settings   settings menu (also: Super+Comma)
+  keys       key bindings (also: Super+F1)
+  menu       quick menu (also: right click on the ember)
   pet        say hello
   mascot on|off
 EOF
@@ -124,12 +220,16 @@ EOF
 
 case ${1:-} in
     "")        status ;;
+    info|fetch) run_or_say sevfetch ;;
     update)    shift; run_or_say sevupdate "$@" ;;
-    doctor)    shift; doctor "$@" ;;
+    doctor)    doctor ;;
+    clean)     clean ;;
+    fix)       fix ;;
+    mem)       mem ;;
     settings)  exec sevsettings ;;
     help|keys) run_or_say sevhelp ;;
     menu)      menu ;;
-    waybar)    waybar ;;
+    waybar)    waybar_json ;;
     pet)       draw happy "*glows a little brighter*" ;;
     mascot)
         mkdir -p "${CONF%/*}"; touch "$CONF"
