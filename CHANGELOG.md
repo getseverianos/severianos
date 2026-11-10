@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (0.2)
+
+- The ember: `sev` shows how the system is doing (failed services, full disk,
+  pending updates) as a small mascot; `sev menu` / right click on the ember in
+  Waybar opens settings, update, doctor, keys and power; `sev mascot off`
+- `sevsettings` (Super+Comma, middle click on the ember): one menu for network,
+  Bluetooth, sound, displays, keyboard, touchpad, power profile, default apps,
+  the ember, update, system info and reset
+- Always in English: the installer asks only for the region (units, paper
+  size); dates in English with a 24-hour clock. Existing installs switch once
+  on upgrade. sevbrowser requests en-US
+
 ## 0.1.0 — 2026-11-09
 
 First version of SeverianOS as a real distribution.

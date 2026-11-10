@@ -4,16 +4,19 @@
   "position": "top",
   "height": 24,
   "spacing": 0,
-  "modules-left": ["custom/mark", "sway/workspaces", "sway/mode"],
+  "modules-left": ["custom/sev", "sway/workspaces", "sway/mode"],
   "modules-center": ["clock"],
   "modules-right": ["custom/updates", "cpu", "memory", "custom/temp", "network",
                     "bluetooth", "sway/language", "pulseaudio", "battery"],
 
-  "custom/mark": {
-    "format": "●",
-    "tooltip": false,
+  "custom/sev": {
+    "exec": "sev waybar",
+    "return-type": "json",
+    "interval": 3600,
+    "signal": 8,
     "on-click": "fuzzel",
-    "on-click-right": "foot --app-id sevhelp -W 64x32 sh -c 'sevhelp; read -rsn1'"
+    "on-click-right": "sev menu",
+    "on-click-middle": "sevsettings"
   },
   "sway/workspaces": { "disable-scroll": true },
   "sway/mode": { "format": "{}" },

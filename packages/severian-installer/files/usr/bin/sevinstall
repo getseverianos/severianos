@@ -214,7 +214,8 @@ while :; do
 done
 
 while :; do
-    ask loc "Language / formats, e.g. de_DE" "en_US"
+    note "SeverianOS is always in English. Your region sets units and paper size."
+    ask loc "Region, e.g. de_DE" "en_US"
     loc=${loc%.UTF-8}; loc=${loc%.utf8}
     LOCALE=$loc.UTF-8
     grep -qx "$LOCALE UTF-8" /usr/share/i18n/SUPPORTED && break
@@ -241,7 +242,7 @@ row boot     "$BOOT  ($([[ $BOOT == uefi ]] && echo systemd-boot || echo GRUB))"
 row fs       "$FS$( (( LUKS )) && echo ', encrypted (LUKS2)')"
 row name     "$HOST"
 row timezone "$TIMEZONE"
-row language "$LOCALE"
+row language "English  (region: $LOCALE)"
 row keyboard "$KB  (console: $KEYMAP)"
 row user     "$USERNAME"
 if [[ -n $REPO_URL ]]; then
@@ -337,10 +338,17 @@ ok "packages installed"
 section "Configuring"
 ln -sf "/usr/share/zoneinfo/$TIMEZONE" "$TARGET/etc/localtime"
 ch hwclock --systohc || true
-echo 'en_US.UTF-8 UTF-8' > "$TARGET/etc/locale.gen"
-if [[ $LOCALE != en_US.UTF-8 ]]; then echo "$LOCALE UTF-8" >> "$TARGET/etc/locale.gen"; fi
+printf '%s\n' 'en_US.UTF-8 UTF-8' 'en_GB.UTF-8 UTF-8' > "$TARGET/etc/locale.gen"
+if [[ $LOCALE != en_US.UTF-8 && $LOCALE != en_GB.UTF-8 ]]; then echo "$LOCALE UTF-8" >> "$TARGET/etc/locale.gen"; fi
 ch locale-gen >/dev/null
-echo "LANG=$LOCALE" > "$TARGET/etc/locale.conf"
+# all text in English; the region only sets units and paper size.
+# en_GB time: English names, 24-hour clock (en_US for the US).
+if [[ $LOCALE == en_US.UTF-8 ]]; then
+    echo "LANG=en_US.UTF-8" > "$TARGET/etc/locale.conf"
+else
+    printf '%s\n' "LANG=en_US.UTF-8" "LC_TIME=en_GB.UTF-8" \
+        "LC_MEASUREMENT=$LOCALE" "LC_PAPER=$LOCALE" > "$TARGET/etc/locale.conf"
+fi
 echo "KEYMAP=$KEYMAP" > "$TARGET/etc/vconsole.conf"
 echo "$HOST" > "$TARGET/etc/hostname"
 cat > "$TARGET/etc/hosts" << EOF
@@ -361,11 +369,7 @@ src_line='[[ -r /usr/share/severian/bashrc ]] && . /usr/share/severian/bashrc'
 for f in "$TARGET/etc/skel/.bashrc" "$TARGET/home/$USERNAME/.bashrc"; do
     grep -qF severian/bashrc "$f" 2>/dev/null || printf '\n%s\n' "$src_line" >> "$f"
 done
-wb=$TARGET/home/$USERNAME/.config/waybar/config.jsonc
-if [[ $LOCALE != en_US.UTF-8 && -f $wb ]]; then
-    sed -i "s|^    \"format\": \"{:%a %d %b  %H:%M}\",|&\n    \"locale\": \"$LOCALE\",|" "$wb"
-fi
-ch runuser -u "$USERNAME" -- env HOME="/home/$USERNAME" LANG="$LOCALE" xdg-user-dirs-update || true
+ch runuser -u "$USERNAME" -- env HOME="/home/$USERNAME" LANG=en_US.UTF-8 xdg-user-dirs-update || true
 ch chown -R "$USERNAME:$USERNAME" "/home/$USERNAME"
 ok "user $USERNAME"
 

@@ -1,12 +1,13 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-config
 pkgver=0.1.0
-pkgrel=4
+pkgrel=5
 pkgdesc='SeverianOS defaults: Sway, Waybar, foot, fuzzel, mako, GTK, zram, oomd, NetworkManager'
 arch=('any')
 url='https://github.com/getseverianos'
 license=('GPL-3.0-or-later')
 backup=('etc/iwd/main.conf')
+install=severian-config.install
 options=('!strip' '!debug')
 
 package() {

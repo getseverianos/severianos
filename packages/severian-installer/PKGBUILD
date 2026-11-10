@@ -1,7 +1,7 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-installer
 pkgver=0.1.0
-pkgrel=6
+pkgrel=7
 pkgdesc='sevinstall – the SeverianOS installer (live medium only)'
 arch=('any')
 url='https://github.com/getseverianos'

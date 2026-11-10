@@ -18,11 +18,13 @@ tooltip {
 }
 tooltip label { color: #d8d2c6; }
 
-#custom-mark {
+#custom-sev {
   padding: 0 10px 0 12px;
   color: #b5523b;
 }
-#custom-mark:hover { color: #c9a66b; }
+#custom-sev.awake   { color: #c9a66b; }
+#custom-sev.worried { color: #d06a50; }
+#custom-sev:hover   { color: #e6e1d8; }
 
 #workspaces button {
   padding: 0 8px;

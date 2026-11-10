@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sev - the ember of SeverianOS. Shows how the system is doing and
+# sev — the ember of SeverianOS. Shows how the system is doing and
 # leads to the other sev* tools. Runs only when called, no daemon.
 set -uo pipefail
 
@@ -82,21 +82,16 @@ waybar() {
 }
 
 # --- menu ----------------------------------------------------------------
-term() { foot --app-id sev-float -e "$@" & }
 menu() {
     local pick
-    pick=$(printf '%s\n' "Settings" "Update" "Doctor" "Keys" "Lock" "Log out" "Suspend" "Reboot" "Power off" |
-        fuzzel --dmenu --prompt "● " --lines 9) || exit 0
+    pick=$(printf '%s\n' settings update doctor keys power |
+        fuzzel --dmenu --prompt '● ' --lines 5 --width 16) || exit 0
     case $pick in
-        Settings)  exec sevsettings ;;
-        Update)    term bash -c 'sev update; read -rp "done - press Enter"' ;;
-        Doctor)    term bash -c 'sev doctor; read -rp "press Enter"' ;;
-        Keys)      exec sevhelp ;;
-        Lock)      exec swaylock -f ;;
-        "Log out") exec swaymsg exit ;;
-        Suspend)   exec systemctl suspend ;;
-        Reboot)    exec systemctl reboot ;;
-        "Power off") exec systemctl poweroff ;;
+        settings) exec sevsettings ;;
+        update)   exec foot --app-id sevupdate sevupdate --wait ;;
+        doctor)   exec foot --app-id sev-float -W 80x24 sh -c 'sev doctor; read -rsn1' ;;
+        keys)     exec foot --app-id sevhelp -W 64x32 sh -c 'sevhelp; read -rsn1' ;;
+        power)    exec sevpower ;;
     esac
 }
 

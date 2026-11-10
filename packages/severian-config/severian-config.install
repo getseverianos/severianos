@@ -1,0 +1,22 @@
+# SeverianOS 0.2: the system is always in English.
+# Once, on upgrade: a non-English LANG becomes en_US.UTF-8; the old
+# region is kept for units and paper size. Takes effect after logging in again.
+_english() {
+    local conf=/etc/locale.conf gen=/etc/locale.gen old l
+    [[ -f $conf ]] || return 0
+    old=$(sed -n 's/^LANG=//p' "$conf" | tr -d '"')
+    [[ -z $old || $old == en_* || $old == C* || $old == POSIX ]] && return 0
+    for l in en_US.UTF-8 en_GB.UTF-8; do
+        if grep -q "^#\s*$l UTF-8" "$gen"; then sed -i "s/^#\s*\($l UTF-8\)/\1/" "$gen"
+        elif ! grep -q "^$l UTF-8" "$gen"; then echo "$l UTF-8" >> "$gen"; fi
+    done
+    locale-gen >/dev/null
+    printf '%s\n' "LANG=en_US.UTF-8" "LC_TIME=en_GB.UTF-8" \
+        "LC_MEASUREMENT=$old" "LC_PAPER=$old" > "$conf"
+    echo "  -> system language is now English (region $old kept for units and paper)."
+    echo "     Log out and in again. New bar and ember: sevconfig reset waybar"
+}
+
+post_upgrade() {
+    _english
+}

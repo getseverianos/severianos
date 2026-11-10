@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sevsettings - one menu for the everyday settings of SeverianOS.
+# sevsettings — one menu for the everyday settings of SeverianOS.
 # Uses fuzzel for choices and foot for tools that need a terminal.
 # Settings that must survive a restart go to
 #   ~/.config/sway/config.d/90-sevsettings.conf
@@ -9,10 +9,10 @@ SWAYD=${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d
 SWAYF=$SWAYD/90-sevsettings.conf
 
 pick() {  # $1 prompt, choices on stdin
-    fuzzel --dmenu --prompt "$1 › " --lines 12
+    fuzzel --dmenu --prompt "● $1  " --lines 12 --width 40
 }
 say() { notify-send -a SeverianOS "Settings" "$1" 2>/dev/null || echo "$1"; }
-term() { exec foot --app-id sev-float -e "$@"; }
+term() { exec foot --app-id sev-float -W 80x24 "$@"; }
 has() { command -v "$1" >/dev/null; }
 
 # remember one sway line under a key, apply it now
@@ -24,17 +24,9 @@ persist() {  # $1 key, $2 sway command
 }
 
 # --- sections ------------------------------------------------------------
-network() {
-    if has nmtui; then term nmtui
-    elif has iwctl; then term iwctl
-    else say "no network tool found"; fi
-}
+network() { exec foot --app-id sevnet -W 80x24 nmtui; }
 
-bluetooth() {
-    if has bluetui; then term bluetui
-    elif has bluetoothctl; then term bluetoothctl
-    else say "bluetooth tools not installed"; fi
-}
+bluetooth() { exec foot --app-id sevbt -W 90x26 bluetui; }
 
 sound() {
     has wpctl || { say "wpctl (wireplumber) not found"; return; }
@@ -76,12 +68,7 @@ display() {
     esac
 }
 
-keyboard() {
-    local l
-    l=$(localectl list-x11-keymap-layouts 2>/dev/null | pick "Keyboard layout") || return
-    persist kbd "input type:keyboard xkb_layout $l"
-    say "keyboard: $l"
-}
+keyboard() { exec sevkeyboard; }
 
 touchpad() {
     local c
@@ -134,7 +121,7 @@ mascot() {
     esac
 }
 
-about() { term bash -c 'sevfetch 2>/dev/null || sev; echo; read -rp "press Enter"'; }
+about() { term sh -c 'sevfetch; echo; sev; read -rsn1'; }
 
 reset() {
     [[ $(printf '%s\n' "No" "Yes, reset my config" | pick "Reset to SeverianOS defaults?") == Yes* ]] || return
@@ -142,11 +129,11 @@ reset() {
 }
 
 # --- main ----------------------------------------------------------------
-sections=(Network Bluetooth Sound Display Keyboard Touchpad Power "Default apps" Mascot Update About Reset)
-choice=$(printf '%s\n' "${sections[@]}" | pick Settings) || exit 0
+sections=(network bluetooth sound display keyboard touchpad power "default apps" ember update about reset)
+choice=$(printf '%s\n' "${sections[@]}" | pick settings) || exit 0
 case $choice in
-    Network) network ;; Bluetooth) bluetooth ;; Sound) sound ;; Display) display ;;
-    Keyboard) keyboard ;; Touchpad) touchpad ;; Power) power ;; "Default apps") defaults ;;
-    Mascot) mascot ;; Update) term bash -c 'sev update; read -rp "done - press Enter"' ;;
-    About) about ;; Reset) reset ;;
+    network) network ;; bluetooth) bluetooth ;; sound) sound ;; display) display ;;
+    keyboard) keyboard ;; touchpad) touchpad ;; power) power ;; "default apps") defaults ;;
+    ember) mascot ;; update) exec foot --app-id sevupdate sevupdate --wait ;;
+    about) about ;; reset) reset ;;
 esac
