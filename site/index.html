@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SeverianOS</title>
+<meta name="description" content="A quiet Sway desktop, based on Arch Linux. Finished on first boot, light on old hardware, one consistent look.">
+<meta property="og:title" content="SeverianOS">
+<meta property="og:description" content="A quiet Sway desktop, based on Arch Linux.">
+<meta property="og:image" content="img/desktop.jpg">
+<link rel="icon" href="img/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Fuligin: one dark world, a single ember accent. Layout: a narrow column, terminal-like rhythm. */
+:root {
+  --bg: #121214;
+  --surface: #1c1b1f;
+  --line: #2a292e;
+  --muted: #8a857c;
+  --fg: #d8d2c6;
+  --bright: #e6e1d8;
+  --ember: #b5523b;
+  --brass: #c9a66b;
+  --mono: "JetBrains Mono", "DejaVu Sans Mono", ui-monospace, monospace;
+  --sans: "Noto Sans", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.65 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--bright); text-decoration-color: var(--ember); text-underline-offset: 3px; }
+a:hover { color: var(--brass); }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+code, pre, .mono { font-family: var(--mono); font-size: 0.9em; }
+code { color: var(--bright); }
+
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+.col { max-width: 680px; }
+
+/* bar, like waybar */
+.bar {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  font: 12px/1 var(--mono);
+}
+.bar .wrap { display: flex; align-items: center; gap: 20px; height: 40px; }
+.bar .dot { color: var(--ember); font-size: 14px; }
+.bar .ws { color: var(--bright); box-shadow: inset 0 -2px var(--ember); padding: 13px 8px; }
+.bar nav { margin-left: auto; display: flex; gap: 18px; flex-wrap: wrap; }
+.bar nav a { color: var(--muted); text-decoration: none; }
+.bar nav a:hover { color: var(--bright); }
+
+header { padding: 72px 0 40px; }
+.mark { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+.mark img { width: 56px; height: 56px; }
+.mark span { font: 600 15px/1 var(--mono); color: var(--bright); letter-spacing: 0.02em; }
+h1 {
+  font: 600 clamp(32px, 5vw, 48px)/1.12 var(--mono);
+  color: var(--bright); margin: 0 0 20px; letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+h1 em { font-style: normal; color: var(--ember); }
+.lede { font-size: 18px; color: var(--fg); margin: 0 0 32px; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.btn {
+  display: inline-block; padding: 12px 20px; border-radius: 6px;
+  font: 600 14px/1 var(--mono); text-decoration: none;
+  border: 1px solid var(--line); color: var(--bright); background: var(--surface);
+}
+.btn.primary { background: var(--ember); border-color: var(--ember); color: var(--bright); }
+.btn.primary:hover { background: #c45d44; color: var(--bright); }
+.btn:hover { border-color: var(--muted); }
+.note { font: 12px/1.5 var(--mono); color: var(--muted); margin-top: 14px; }
+
+.shot { margin: 8px 0 0; }
+.shot img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--line); border-radius: 6px;
+}
+.shot figcaption { font: 12px/1.5 var(--mono); color: var(--muted); margin-top: 10px; }
+
+section { padding: 72px 0 0; }
+h2 {
+  font: 600 13px/1 var(--mono); text-transform: lowercase; letter-spacing: 0.04em;
+  color: var(--ember); margin: 0 0 24px;
+}
+h2::before { content: "● "; }
+h3 { font: 600 16px/1.3 var(--mono); color: var(--bright); margin: 0 0 6px; }
+
+.facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+}
+.facts div { background: var(--bg); padding: 20px; }
+.facts b { display: block; font: 600 22px/1.2 var(--mono); color: var(--bright); font-variant-numeric: tabular-nums; }
+.facts span { font-size: 14px; color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px 40px; }
+.grid p { margin: 0; color: var(--fg); font-size: 15px; }
+
+.tools { width: 100%; border-collapse: collapse; font-size: 15px; }
+.tools td { padding: 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tools td:first-child { font-family: var(--mono); color: var(--brass); white-space: nowrap; padding-right: 24px; width: 1%; }
+.tools kbd { font: 12px var(--mono); color: var(--muted); }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+@media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+
+pre {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 16px 18px; overflow-x: auto; color: var(--bright); line-height: 1.6; margin: 12px 0 0;
+}
+pre .c { color: var(--muted); }
+ol.steps { padding-left: 1.2em; margin: 0; }
+ol.steps li { margin-bottom: 14px; }
+ol.steps li::marker { font-family: var(--mono); color: var(--ember); }
+
+ul.plain { list-style: none; padding: 0; margin: 0; }
+ul.plain li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+ul.plain li::before { content: "– "; color: var(--muted); }
+.yes::before { content: "✓ " !important; color: #7f9a65 !important; }
+.no::before { content: "✗ " !important; color: var(--brass) !important; }
+
+.soon { border: 1px dashed var(--line); border-radius: 6px; padding: 20px 24px; }
+.soon p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+
+footer {
+  margin-top: 96px; padding: 28px 0 40px; border-top: 1px solid var(--line);
+  font: 12px/1.7 var(--mono); color: var(--muted);
+}
+footer .wrap { display: flex; gap: 24px; justify-content: space-between; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="wrap">
+    <span class="dot" aria-hidden="true">●</span>
+    <span class="ws">1</span>
+    <nav aria-label="Sections">
+      <a href="#features">features</a>
+      <a href="#hardware">hardware</a>
+      <a href="#install">install</a>
+      <a href="https://github.com/getseverianos/severianos">github</a>
+    </nav>
+  </div>
+</div>
+
+<main class="wrap">
+  <header>
+    <div class="col">
+      <div class="mark">
+        <img src="img/logo.svg" alt="SeverianOS logo: an old sun on the horizon with a rising ember" width="56" height="56">
+        <span>SeverianOS</span>
+      </div>
+      <h1>A quiet Sway desktop, <em>based on Arch Linux.</em></h1>
+      <p class="lede">SeverianOS boots into a finished tiling desktop with one consistent look, from the boot menu to the shell prompt. It stays light enough for a ten-year-old laptop and needs no evening of setup.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/getseverianos/severianos/releases/latest">Download the ISO</a>
+        <a class="btn" href="https://github.com/getseverianos/severianos">Source on GitHub</a>
+      </div>
+      <p class="note">x86-64 · AMD and Intel graphics · signed ISO and packages · free software (GPL-3.0)</p>
+    </div>
+  </header>
+
+  <figure class="shot">
+    <img src="img/desktop.jpg" alt="SeverianOS desktop on a ThinkPad T440p: a terminal with sevfetch on the left, Firefox on the right, Waybar at the top" width="1920" height="1080">
+    <figcaption>ThinkPad T440p, 2013 · terminal and browser side by side, Waybar on top</figcaption>
+  </figure>
+
+  <section aria-labelledby="small">
+    <h2 id="small">small on purpose</h2>
+    <div class="facts">
+      <div><b>~4.3 GB</b><span>on disk after installation</span></div>
+      <div><b>~650 MiB</b><span>in use after login, one terminal open (T440p)</span></div>
+      <div><b>x86-64 v1</b><span>no AVX2 needed, old CPUs welcome</span></div>
+      <div><b>1</b><span>theme, everywhere: Fuligin</span></div>
+    </div>
+  </section>
+
+  <section id="features" aria-labelledby="f">
+    <h2 id="f">what you get</h2>
+    <div class="grid">
+      <div><h3>Sway, finished</h3><p>Waybar, foot, fuzzel, mako, swaylock and swayidle, configured to work together on first boot. Super+F1 shows every shortcut.</p></div>
+      <div><h3>Fuligin everywhere</h3><p>A near-black palette with one ember accent across boot menu, console, login, desktop, GTK apps and terminal.</p></div>
+      <div><h3>A browser without the noise</h3><p>sevbrowser is Firefox with telemetry, studies, Pocket and sponsored content switched off and a local start page.</p></div>
+      <div><h3>Light on memory</h3><p>zram swap and systemd-oomd keep machines with little RAM responsive. Every feature is measured before it ships.</p></div>
+      <div><h3>Signed updates</h3><p>SeverianOS packages come from a signed repository on top of Arch Linux. The bar shows pending updates; one click installs them.</p></div>
+      <div><h3>Your configs stay yours</h3><p>sevconfig compares your files with the defaults and restores them on request, with a backup of your version.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t">
+    <h2 id="t">small tools of its own</h2>
+    <div class="col">
+      <table class="tools">
+        <tr><td>sevinstall</td><td>the installer: ext4 or btrfs, optional full-disk encryption, UEFI or BIOS</td></tr>
+        <tr><td>sevupdate</td><td>update the system</td></tr>
+        <tr><td>sevconfig</td><td>compare your configs with the defaults, restore them</td></tr>
+        <tr><td>sevhelp</td><td>all shortcuts <kbd>super + f1</kbd></td></tr>
+        <tr><td>sevkeyboard</td><td>pick a keyboard layout <kbd>super + f2</kbd></td></tr>
+        <tr><td>sevpower</td><td>lock, log out, reboot, power off <kbd>super + shift + e</kbd></td></tr>
+        <tr><td>sevshot</td><td>screenshots to ~/Pictures/Screenshots <kbd>super + print</kbd></td></tr>
+        <tr><td>sevbattery</td><td>warns at 10 % and 5 % battery</td></tr>
+        <tr><td>sevfetch</td><td>system info</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="n">
+    <h2 id="n">coming in 0.2</h2>
+    <div class="soon col">
+      <p>In testing now, not in the current ISO yet:</p>
+      <ul class="plain">
+        <li><b>sev</b>, the ember: system status in the bar and terminal, plus <code>sev doctor</code>, <code>sev clean</code> and <code>sev fix</code></li>
+        <li>One settings menu for network, sound, displays, keyboard, touchpad and more</li>
+        <li>Display profiles, clipboard history, night light, screen recording</li>
+        <li>A package manager menu to search, install and remove software</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="hardware" aria-labelledby="h">
+    <h2 id="h">hardware</h2>
+    <div class="two">
+      <ul class="plain">
+        <li class="yes">Any x86-64 CPU, baseline v1</li>
+        <li class="yes">AMD and Intel graphics via Mesa</li>
+        <li class="yes">UEFI (Secure Boot off) or legacy BIOS</li>
+        <li class="yes">4 GB RAM recommended, 20 GB disk recommended (12 GB minimum)</li>
+        <li class="no">Nvidia is not supported</li>
+      </ul>
+      <div>
+        <p style="margin-top:0">Tested on a ThinkPad T440p (Intel HD 4600) and an AMD A10-6700 desktop (Radeon HD 8670D). Older AMD cards such as the HD 8670D run without Vulkan; that is a limit of the hardware.</p>
+        <p><a href="https://github.com/getseverianos/severianos/blob/main/docs/hardware.md">Tested machines</a> · <a href="https://github.com/getseverianos/severianos/blob/main/docs/known-issues.md">Known issues</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" aria-labelledby="i">
+    <h2 id="i">install</h2>
+    <div class="two">
+      <ol class="steps">
+        <li>Download the ISO and its checksum from the <a href="https://github.com/getseverianos/severianos/releases/latest">latest release</a>.</li>
+        <li>Check the download, then write it to a USB stick.</li>
+        <li>Boot from the stick. The live system is a full SeverianOS desktop.</li>
+        <li>Press Super+D and choose <b>Install SeverianOS</b>.</li>
+      </ol>
+      <div>
+<pre><span class="c"># check the download</span>
+sha256sum -c severianos-*-x86_64.iso.sha256
+
+<span class="c"># write it to a stick (replace sdX!)</span>
+sudo dd if=severianos-*-x86_64.iso of=/dev/sdX \
+  bs=4M status=progress oflag=sync</pre>
+        <p class="note">Signature check with gpg: see the release notes. <a href="https://github.com/getseverianos/severianos/blob/main/docs/getting-started.md">Getting started</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s">
+    <h2 id="s">the first terminal</h2>
+    <figure class="shot col">
+      <img src="img/sevfetch.jpg" alt="sevfetch in the foot terminal, showing SeverianOS, the kernel, Intel Core i5-4300M and memory use" width="1920" height="1080" loading="lazy">
+      <figcaption>sevfetch greets you once per session</figcaption>
+    </figure>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>SeverianOS · GPL-3.0 · the name and the old sun nod to Gene Wolfe's <i>The Book of the New Sun</i></span>
+    <span>Not affiliated with or endorsed by Arch Linux. Please report issues <a href="https://github.com/getseverianos/severianos/issues">on GitHub</a>, not on the Arch forums.</span>
+  </div>
+</footer>
+
+</body>
+</html>
