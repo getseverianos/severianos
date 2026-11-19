@@ -1,24 +1,117 @@
 #!/usr/bin/env bash
-# sevwelcome — greet the user once (on the live medium: every session)
+# sevwelcome — first start of SeverianOS
+#   sevwelcome            (autostart) theme once; live: a hint; installed: the
+#                         first-start window once
+#   sevwelcome --setup    the first-start window (also: sev welcome)
+#   sevwelcome --hw       hardware check only
 
 state=${XDG_STATE_HOME:-$HOME/.local/state}/severian
 live=0; [[ -d /run/archiso ]] && live=1
+e=$'\e[38;2;181;82;59m'; b=$'\e[38;2;201;166;107m'; g=$'\e[38;2;127;154;101m'; m=$'\e[38;2;111;106;98m'; r=$'\e[0m'
 
-# Once per user: tell GTK 4 / portal-aware apps (Firefox too) to prefer dark
-if [[ ! -e $state/theme && -n ${WAYLAND_DISPLAY:-} ]] && command -v gsettings >/dev/null; then
-    mkdir -p "$state"
-    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null
-    gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark' 2>/dev/null
-    gsettings set org.gnome.desktop.interface icon-theme 'Adwaita' 2>/dev/null
-    gsettings set org.gnome.desktop.interface cursor-theme 'Adwaita' 2>/dev/null
-    gsettings set org.gnome.desktop.interface font-name 'Noto Sans 10' 2>/dev/null
-    touch "$state/theme"
+theme_once() {
+    # Once per user: tell GTK 4 / portal-aware apps (Firefox too) to prefer dark
+    if [[ ! -e $state/theme && -n ${WAYLAND_DISPLAY:-} ]] && command -v gsettings >/dev/null; then
+        mkdir -p "$state"
+        gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null
+        gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark' 2>/dev/null
+        gsettings set org.gnome.desktop.interface icon-theme 'Adwaita' 2>/dev/null
+        gsettings set org.gnome.desktop.interface cursor-theme 'Adwaita' 2>/dev/null
+        gsettings set org.gnome.desktop.interface font-name 'Noto Sans 10' 2>/dev/null
+        touch "$state/theme"
+    fi
+}
+
+# --- hardware check --------------------------------------------------------
+hw() {
+    local gpu drv vk va bat ram
+    yes_() { printf '  %s✓%s %-14s %s\n' "$g" "$r" "$1" "$2"; }
+    no_()  { printf '  %s–%s %-14s %s\n' "$b" "$r" "$1" "$2"; }
+
+    gpu=$(lspci 2>/dev/null | sed -n 's/.*\(VGA\|Display\|3D\)[^:]*: //p' | head -n1)
+    drv=$(for c in /sys/class/drm/card[0-9]/device/driver; do basename "$(readlink -f "$c")"; done 2>/dev/null | head -n1)
+    ram=$(free -g | awk '/^Mem:/ {print $2 + 1}')
+    printf '  %-16s %s\n' "graphics" "${gpu:-unknown}  (${drv:-?})"
+    printf '  %-16s %s GB\n\n' "memory" "$ram"
+
+    case $drv in
+        i915|xe|amdgpu) yes_ "desktop" "full acceleration" ;;
+        radeon)         yes_ "desktop" "accelerated (older AMD card, radeon driver)" ;;
+        nouveau|nvidia) no_  "desktop" "Nvidia is not supported – expect problems" ;;
+        *)              no_  "desktop" "software rendering – slow" ;;
+    esac
+
+    if command -v vulkaninfo >/dev/null; then
+        vk=$(vulkaninfo --summary 2>/dev/null | sed -n 's/.*deviceName *= *//p' | grep -vi llvmpipe | head -n1)
+        if [[ -n $vk ]]; then yes_ "vulkan" "$vk"; else no_ "vulkan" "not available on this GPU (games may not run)"; fi
+    elif [[ $drv == radeon ]]; then
+        no_ "vulkan" "not available on this GPU (games may not run)"
+    fi
+
+    if command -v vainfo >/dev/null; then
+        va=$(vainfo 2>/dev/null | sed -n 's/.*Driver version: //p' | head -n1)
+        if [[ -n $va ]]; then yes_ "video decoding" "$va"; else no_ "video decoding" "in software (uses more CPU and battery)"; fi
+    fi
+
+    if ls /sys/class/power_supply/BAT* >/dev/null 2>&1; then
+        bat=$(cat /sys/class/power_supply/BAT*/capacity 2>/dev/null | head -n1)
+        yes_ "laptop" "battery ${bat}% · warnings at 10% and 5% · power profiles in settings"
+    fi
+    if (( ram <= 4 )); then
+        no_ "low memory" "zram is on; close the browser when you don't need it"
+    fi
+    echo
+}
+
+# --- first-start window -----------------------------------------------------
+setup() {
+    local a
+    clear
+    printf '\n  %s●%s welcome to SeverianOS\n\n' "$e" "$r"
+    hw
+
+    printf '  %s1%s  keyboard\n' "$e" "$r"
+    read -rp "     change the keyboard layout? [y/N] " a
+    [[ $a == [yY]* ]] && sevkeyboard
+
+    printf '\n  %s2%s  network\n' "$e" "$r"
+    if nmcli -t -f STATE general 2>/dev/null | grep -q '^connected'; then
+        printf '     connected\n'
+    else
+        read -rp "     not connected. set up Wi-Fi now? [Y/n] " a
+        [[ -z $a || $a == [yY]* ]] && nmtui connect
+    fi
+
+    printf '\n  %s3%s  night light\n' "$e" "$r"
+    read -rp "     warmer colours from 20:00 to 07:00? [y/N] " a
+    [[ $a == [yY]* ]] && sevnight auto >/dev/null
+
+    printf '\n  %s4%s  updates\n' "$e" "$r"
+    read -rp "     update the system now? [Y/n] " a
+    [[ -z $a || $a == [yY]* ]] && sevupdate
+
+    printf '\n  %s5%s  the keys you need\n\n' "$e" "$r"
+    printf '     super + enter     terminal\n     super + d         apps\n'
+    printf '     super + comma     settings\n     super + f1        all shortcuts\n'
+    printf '     click the ember   (top left) menu\n\n'
+    printf '  %sopen this again any time: sev welcome%s\n' "$m" "$r"
+    printf '\n  %spress any key to close%s' "$m" "$r"; read -rsn1
+}
+
+case ${1:-} in
+    --setup) setup; exit ;;
+    --hw)    printf '\n'; hw; exit ;;
+esac
+
+theme_once
+if (( live )); then
+    sleep 2
+    notify-send -a SeverianOS "Welcome to SeverianOS" \
+        $'super + enter   terminal\nsuper + d       apps\nsuper + f1      all shortcuts\n\nto install: super + d → Install SeverianOS'
+    exit 0
 fi
 
-[[ -e $state/welcomed && $live -eq 0 ]] && exit 0
+[[ -e $state/welcomed ]] && exit 0
 mkdir -p "$state" && touch "$state/welcomed"
-
 sleep 2
-body=$'super + enter   terminal\nsuper + d       apps\nsuper + f1      all shortcuts'
-(( live )) && body+=$'\n\nto install: super + d → Install SeverianOS'
-notify-send -a SeverianOS "Welcome to SeverianOS" "$body"
+exec foot --app-id sev-float -W 84x40 sevwelcome --setup

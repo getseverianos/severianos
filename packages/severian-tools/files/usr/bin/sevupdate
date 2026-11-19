@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# sevupdate — update SeverianOS
-#   sevupdate           update everything (pacman -Syu)
+# sevupdate — update SeverianOS, carefully
+#   sevupdate           update everything
 #   sevupdate --count   print pending updates as Waybar JSON
 #   sevupdate --wait    update, then wait for a key (used by the bar)
+#
+# Before the update: clear a stale pacman lock, show new Arch Linux news
+# that may need manual steps, take a btrfs snapshot (if / is btrfs).
+# If the update fails: offer fresh mirrors and one more try.
 
 if [[ ${1:-} == --count ]]; then
     n=$(checkupdates 2>/dev/null | wc -l)
@@ -17,20 +21,88 @@ fi
 wait=0
 [[ ${1:-} == --wait ]] && { wait=1; shift; }
 
-e=$'\e[38;2;181;82;59m'; m=$'\e[38;2;111;106;98m'; r=$'\e[0m'
+e=$'\e[38;2;181;82;59m'; b=$'\e[38;2;201;166;107m'; m=$'\e[38;2;111;106;98m'; r=$'\e[0m'
+say()  { printf '  %s\n' "$*"; }
+note() { printf '  %s%s%s\n' "$m" "$*" "$r"; }
+warn() { printf '  %s!%s %s\n' "$b" "$r" "$*"; }
+ask()  { local a; read -rp "  $1 " a; [[ -z $a || $a == [yY]* ]]; }   # default yes
+finish() {
+    if (( wait )); then printf '\n  %spress any key to close%s\n' "$m" "$r"; read -rsn1; fi
+    exit "$1"
+}
+
 printf '\n  %s●%s updating SeverianOS\n\n' "$e" "$r"
 
+# --- 1. a stale lock from an interrupted update ---------------------------
+if [[ -e /var/lib/pacman/db.lck ]]; then
+    if pgrep -x pacman >/dev/null; then
+        warn "another update is running – wait for it to finish"; finish 1
+    fi
+    warn "an earlier update was interrupted and left a lock behind"
+    if ask "remove the lock and continue? [Y/n]"; then
+        sudo rm -f /var/lib/pacman/db.lck || finish 1
+    else
+        finish 1
+    fi
+fi
+
+# --- 2. Arch Linux news since the last update -----------------------------
+state=${XDG_STATE_HOME:-$HOME/.local/state}/severian
+mkdir -p "$state"
+seen=$(cat "$state/news-seen" 2>/dev/null || echo 0)
+if feed=$(curl -fsS --max-time 8 https://archlinux.org/feeds/news/ 2>/dev/null); then
+    news=$(awk -v RS='<item>' 'NR > 1 {
+            t = $0; sub(/.*<title>/, "", t); sub(/<\/title>.*/, "", t)
+            d = $0; sub(/.*<pubDate>/, "", d); sub(/<\/pubDate>.*/, "", d)
+            print d "\t" t }' <<<"$feed" |
+        while IFS=$'\t' read -r d t; do
+            s=$(date -d "$d" +%s 2>/dev/null) || continue
+            (( s > seen )) && printf '%s\t%s\n' "$(date -d "$d" +%Y-%m-%d)" "$t"
+        done)
+    if [[ -n $news && $seen != 0 ]]; then
+        warn "Arch Linux news since your last update:"
+        while IFS=$'\t' read -r d t; do
+            t=$(sed -e 's/&lt;/</g; s/&gt;/>/g; s/&#39;/'"'"'/g; s/&quot;/"/g; s/&amp;/\&/g' <<<"$t")
+            printf '    %s%s%s  %s\n' "$m" "$d" "$r" "$t"
+        done <<<"$news"
+        note "read them first if one sounds like manual steps: archlinux.org/news"
+        ask "continue with the update? [Y/n]" || finish 1
+        echo
+    fi
+    date +%s > "$state/news-seen"
+fi
+
+# --- 3. snapshot ----------------------------------------------------------
+if command -v sevsnap >/dev/null && sevsnap supported; then
+    sudo sevsnap create "before update" && echo
+fi
+
+# --- 4. update, with one retry on fresh mirrors ---------------------------
 status=0
 sudo pacman -Syu "$@" || status=$?
+
+if (( status != 0 )) && [[ ! -e /var/lib/pacman/db.lck ]]; then
+    echo
+    warn "the update did not finish – often a slow or broken mirror"
+    if command -v reflector >/dev/null && ask "pick fresh mirrors and try again? [Y/n]"; then
+        note "testing mirrors (up to a minute)…"
+        if sudo systemctl start reflector.service 2>/dev/null; then
+            say "mirror list updated"
+        else
+            note "could not refresh mirrors – trying again anyway"
+        fi
+        status=0
+        sudo pacman -Syu "$@" || status=$?
+    fi
+fi
 
 if (( status == 0 )); then
     pkill -RTMIN+8 waybar 2>/dev/null || true
     command -v sevconfig >/dev/null && sevconfig status --brief
     [[ -e /usr/lib/modules/$(uname -r) ]] || printf '\n  %sa new kernel was installed – reboot when convenient%s\n' "$m" "$r"
+else
+    echo
+    warn "the update failed – nothing is half-installed if pacman stopped before 'checking keys'"
+    command -v sevsnap >/dev/null && sevsnap supported && note "if the system misbehaves: sev rollback"
 fi
-
-if (( wait )); then
-    printf '\n  %spress any key to close%s\n' "$m" "$r"
-    read -rsn1
-fi
-exit "$status"
+finish "$status"

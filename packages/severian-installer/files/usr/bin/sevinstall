@@ -300,7 +300,7 @@ if [[ $FS == ext4 ]]; then
 else
     mkfs.btrfs -q -f -L severian "$ROOTDEV"
     mount "$ROOTDEV" "$TARGET"
-    for sv in @ @home @log @pkg; do btrfs -q subvolume create "$TARGET/$sv"; done
+    for sv in @ @home @log @pkg @snapshots; do btrfs -q subvolume create "$TARGET/$sv"; done
     umount "$TARGET"
     O=noatime,compress=zstd:1
     mount -o "$O,subvol=@" "$ROOTDEV" "$TARGET"
@@ -458,7 +458,7 @@ rm -f "$TARGET"/var/lib/pacman/sync/severian.*
 
 ch systemctl enable NetworkManager.service iwd.service greetd.service bluetooth.service \
     power-profiles-daemon.service systemd-timesyncd.service systemd-oomd.service \
-    fstrim.timer paccache.timer >/dev/null
+    fstrim.timer paccache.timer reflector.timer >/dev/null
 ok "services"
 
 section "Finishing"

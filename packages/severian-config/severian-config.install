@@ -17,6 +17,17 @@ _english() {
     echo "     Log out and in again. New bar and ember: sevconfig reset waybar"
 }
 
+# 0.3: mirrors are refreshed weekly
+_reflector() {
+    systemctl is-enabled -q reflector.timer 2>/dev/null && return 0
+    systemctl enable reflector.timer >/dev/null 2>&1 && echo "  -> weekly mirror refresh enabled (reflector.timer)"
+}
+
+post_install() {
+    _reflector
+}
+
 post_upgrade() {
     _english
+    _reflector
 }

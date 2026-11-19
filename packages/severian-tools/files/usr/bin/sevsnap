@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# sevsnap — btrfs snapshots of the system (subvolume @), for SeverianOS
+# installs on btrfs. /home, logs and the package cache are separate
+# subvolumes and are not touched.
+#
+#   sevsnap supported            exit 0 if / is the btrfs subvolume @
+#   sevsnap list
+#   sevsnap create [note]        read-only snapshot + copy of /boot kernels
+#   sevsnap rollback [NAME]      make NAME the system after the next reboot
+#   sevsnap prune                keep the newest 3, remove old rolled-back systems
+#
+# From a live stick, when the installed system does not boot:
+#   sudo sevsnap --device /dev/sdXn rollback        (open LUKS first)
+set -uo pipefail
+
+KEEP=3
+TOP=/run/sevsnap
+DEV=""
+BOOTDIR=/boot
+
+if [[ ${1:-} == --device ]]; then DEV=$2; shift 2; fi
+cmd=${1:-list}; shift || true
+
+die() { echo "sevsnap: $*" >&2; exit 1; }
+
+root_is_at() {
+    [[ $(findmnt -no FSTYPE /) == btrfs ]] && findmnt -no OPTIONS / | grep -qE '(^|,)subvol=/?@(,|$)'
+}
+
+if [[ $cmd == supported ]]; then root_is_at; exit; fi
+
+[[ $EUID -eq 0 ]] || die "run as root (sudo sevsnap $cmd)"
+
+mount_top() {
+    local dev=${DEV:-$(findmnt -no SOURCE / | sed 's/\[.*//')}
+    [[ -n $DEV ]] || root_is_at || die "/ is not on btrfs subvolume @ – snapshots need a btrfs install"
+    mkdir -p "$TOP"
+    mountpoint -q "$TOP" || mount -t btrfs -o subvolid=5 "$dev" "$TOP" || die "cannot mount $dev"
+    mkdir -p "$TOP/@snapshots"
+    if [[ -n $DEV ]]; then
+        # live stick: /boot of the installed system lives on its ESP, mounted by the user
+        BOOTDIR=${SEVSNAP_BOOT:-/mnt/boot}
+    fi
+}
+umount_top() { mountpoint -q "$TOP" && umount "$TOP"; }
+trap umount_top EXIT
+
+boot_files() { ls "$1"/vmlinuz-* "$1"/initramfs-*.img "$1"/*-ucode.img 2>/dev/null; }
+
+list() {
+    local s
+    for s in "$TOP"/@snapshots/*/; do
+        [[ -d $s/root ]] || continue
+        s=${s%/}; printf '%s  %s\n' "${s##*/}" "$(cat "$s/note" 2>/dev/null)"
+    done | sort -r
+}
+
+create() {
+    local name dir f
+    name=$(date +%Y-%m-%d_%H%M%S)
+    dir=$TOP/@snapshots/$name
+    mkdir -p "$dir/boot"
+    btrfs -q subvolume snapshot -r "$TOP/@" "$dir/root" || { rm -rf "$dir"; die "snapshot failed"; }
+    while read -r f; do cp -a "$f" "$dir/boot/"; done < <(boot_files "$BOOTDIR")
+    echo "${*:-manual}" > "$dir/note"
+    echo "  snapshot $name"
+    prune quiet
+}
+
+prune() {
+    local s n=0
+    while read -r s; do
+        n=$((n + 1)); (( n <= KEEP )) && continue
+        btrfs -q subvolume delete "$TOP/@snapshots/$s/root" && rm -rf "${TOP:?}/@snapshots/$s"
+    done < <(list | awk '{print $1}')
+    for s in "$TOP"/@old-*; do
+        [[ -d $s ]] || continue
+        btrfs -q subvolume delete "$s" 2>/dev/null
+    done
+    [[ ${1:-} == quiet ]] || echo "  kept the newest $KEEP snapshots"
+}
+
+rollback() {
+    local name=${1:-} dir old
+    if [[ -z $name ]]; then
+        echo "  snapshots:"; list | sed 's/^/    /'
+        read -rp "  roll back to (name): " name
+    fi
+    dir=$TOP/@snapshots/$name
+    [[ -d $dir/root ]] || die "no snapshot $name"
+    read -rp "  the system will be as on $name after a reboot. /home is not touched. continue? [y/N] " a
+    [[ $a == [yY]* ]] || exit 1
+
+    old=@old-$(date +%Y-%m-%d_%H%M%S)
+    mv "$TOP/@" "$TOP/$old" || die "cannot move the current system aside"
+    if ! btrfs -q subvolume snapshot "$dir/root" "$TOP/@"; then
+        mv "$TOP/$old" "$TOP/@"; die "rollback failed – nothing changed"
+    fi
+    if [[ -n $(ls "$dir/boot" 2>/dev/null) ]]; then
+        cp -a "$dir"/boot/* "$BOOTDIR/" || echo "  warning: could not restore the kernel in $BOOTDIR"
+    fi
+    sync
+    echo "  done – reboot now. the replaced system is kept as $old until the next 'sevsnap prune'."
+}
+
+mount_top
+case $cmd in
+    list)     list ;;
+    create)   create "$@" ;;
+    rollback) rollback "$@" ;;
+    prune)    prune ;;
+    *) sed -n '2,15s/^# \{0,1\}//p' "$0"; exit 1 ;;
+esac

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# sevbench — measure SeverianOS the same way every time
+#   sevbench           print the numbers
+#   sevbench --save    also append them to ~/.local/state/severian/bench.tsv
+#
+# How SeverianOS measures memory: reboot, log in, open one terminal,
+# wait 2 minutes, run sevbench. "ram" is "used" from free.
+
+e=$'\e[38;2;181;82;59m'; m=$'\e[38;2;111;106;98m'; r=$'\e[0m'
+
+up=$(awk '{print int($1)}' /proc/uptime)
+ram=$(free -m | awk '/^Mem:/ {print $3}')
+swap=$(free -m | awk '/^Swap:/ {print $3}')
+disk=$(df -BM --output=used / | tail -n1 | tr -dc 0-9)
+boot=$(systemd-analyze 2>/dev/null | sed -n 's/.*= \([0-9.]*m\{0,1\}s\)$/\1/p; s/.*= \([0-9]*min [0-9.]*s\)$/\1/p' | head -n1)
+pkgs=$(pacman -Qq | wc -l)
+procs=$(ps -e --no-headers | wc -l)
+model=$(cat /sys/devices/virtual/dmi/id/product_version 2>/dev/null || cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null)
+ver=$(. /etc/os-release && echo "${VERSION_ID:-?}")
+
+printf '\n  %s●%s sevbench  %s%s · SeverianOS %s · %s%s\n\n' "$e" "$r" "$m" "${model:-unknown}" "$ver" "$(uname -r)" "$r"
+printf '  %-10s %s MiB\n' ram "$ram" swap "$swap"
+printf '  %-10s %s MiB\n' disk "$disk"
+printf '  %-10s %s\n' boot "${boot:-?}" packages "$pkgs" processes "$procs"
+if (( up < 120 )); then
+    printf '\n  %suptime %ss – for comparable numbers wait until 2 minutes after login%s\n' "$m" "$up" "$r"
+fi
+echo
+
+if [[ ${1:-} == --save ]]; then
+    f=${XDG_STATE_HOME:-$HOME/.local/state}/severian/bench.tsv
+    mkdir -p "${f%/*}"
+    [[ -s $f ]] || printf 'date\tversion\tkernel\tram_mib\tdisk_mib\tboot\tpackages\tuptime_s\n' > "$f"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date +%F_%H:%M)" "$ver" "$(uname -r)" "$ram" "$disk" "${boot:-?}" "$pkgs" "$up" >> "$f"
+    printf '  %ssaved to %s%s\n\n' "$m" "${f/#$HOME/\~}" "$r"
+fi

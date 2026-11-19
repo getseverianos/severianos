@@ -130,6 +130,16 @@ doctor() {
     if ((n > 0)); then warn "$n error line(s) in the log since boot"; hint "journalctl -b -p 3"
     else good "no errors in the log since boot"; fi
 
+    if command -v sevsnap >/dev/null && sevsnap supported; then
+        n=$(sudo -n sevsnap list 2>/dev/null | wc -l)
+        if sudo -n true 2>/dev/null; then good "$n snapshot(s) to roll back to"
+        else good "snapshots before updates are on (sev rollback)"; fi
+    fi
+
+    if ! systemctl is-enabled -q reflector.timer 2>/dev/null; then
+        warn "mirrors are not refreshed automatically"; hint "sudo systemctl enable --now reflector.timer"
+    fi
+
     if [[ -e /usr/lib/modules/$(uname -r) ]]; then good "running the installed kernel"
     else warn "a new kernel is installed"; hint "reboot when convenient"; fi
     echo
@@ -182,6 +192,19 @@ mem() {
     echo
 }
 
+# --- rollback ------------------------------------------------------------
+rollback() {
+    command -v sevsnap >/dev/null || { echo "sev: sevsnap is not installed" >&2; exit 1; }
+    if ! sevsnap supported; then
+        head_ "sev rollback"
+        warn "snapshots need a btrfs install (this system uses $(findmnt -no FSTYPE /))"
+        hint "on ext4, an older package version can be installed with: sudo pacman -U /var/cache/pacman/pkg/NAME-VERSION…"
+        echo; exit 1
+    fi
+    head_ "sev rollback"
+    sudo sevsnap rollback "$@"
+}
+
 # --- menu ----------------------------------------------------------------
 menu() {
     local pick
@@ -210,6 +233,9 @@ usage: sev [command]
   clean      free disk space (package cache, old logs, unused packages)
   fix        repair common problems (stale pacman lock)
   mem        where the memory goes
+  bench      measure ram, disk and boot time (sevbench)
+  rollback   undo the last update (btrfs installs)
+  welcome    first-start setup and hardware check
   settings   settings menu (also: Super+Comma)
   keys       key bindings (also: Super+F1)
   menu       quick menu (also: right click on the ember)
@@ -226,6 +252,10 @@ case ${1:-} in
     clean)     clean ;;
     fix)       fix ;;
     mem)       mem ;;
+    bench)     shift; run_or_say sevbench "$@" ;;
+    rollback)  shift; rollback "$@" ;;
+    welcome)   exec sevwelcome --setup ;;
+    hw)        exec sevwelcome --hw ;;
     settings)  exec sevsettings ;;
     help|keys) run_or_say sevhelp ;;
     menu)      menu ;;

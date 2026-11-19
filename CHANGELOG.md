@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased (0.3)
+
+- Careful updates: `sevupdate` clears a lock left by an interrupted update,
+  shows new Arch Linux news before updating, and offers fresh mirrors and a
+  second try when an update fails
+- Snapshots on btrfs installs: `sevupdate` takes one before every update
+  (kernel included, newest 3 kept); `sev rollback` returns to one after a
+  reboot. /home is not touched. New installs get an @snapshots subvolume
+- Mirrors are refreshed weekly (reflector.timer)
+- Tuning: zram-friendly memory settings, I/O scheduler by disk type
+  (bfq for hard disks), journal limited to 200 MB
+- Video decoding on older Intel graphics (Haswell and earlier, e.g. ThinkPad
+  T440p): libva-intel-driver
+- First start: `sevwelcome` opens a short setup (keyboard, Wi-Fi, night light,
+  updates, keys) and a hardware check (`sev hw`): acceleration, Vulkan,
+  video decoding, battery
+- `sevbench` measures RAM, disk and boot time the same way every time
+- `build.sh release` checks that every file arrived on GitHub
+
 ## Unreleased (0.2)
 
 - The ember: `sev` shows how the system is doing (failed services, full disk,

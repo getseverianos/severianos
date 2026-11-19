@@ -179,6 +179,34 @@ publish() {
     [[ $REPO_URL == "$url" ]] || note "set REPO_URL=\"$url\" in config.sh, then rebuild (./build.sh all)"
 }
 
+# Check that every file reached the GitHub release, complete and with the right size.
+verify_release() {
+    local tag=$1 repo=$2 listing f name want try
+    local -a bad
+    shift 2
+    for try in 1 2 3 4 5 6; do
+        bad=()
+        listing=$(gh release view "$tag" -R "$repo" --json assets \
+            --jq '.assets[] | [.name, .size, .state] | @tsv') || listing=""
+        for f in "$@"; do
+            name=${f##*/}
+            want=$(stat -c %s "$f")
+            if ! grep -Fxq "$name"$'\t'"$want"$'\tuploaded' <<<"$listing"; then
+                bad+=("$name")
+            fi
+        done
+        if ((${#bad[@]} == 0)); then
+            ok "all $# files verified in release $tag"
+            return 0
+        fi
+        if ((try < 6)); then
+            note "waiting for GitHub: ${bad[*]}"
+            sleep 10
+        fi
+    done
+    die "release $tag is incomplete: ${bad[*]}"
+}
+
 release() {
     local tag=v$VERSION iso=$OUT/severianos-$VERSION-x86_64.iso repo notes f
     step "Release SeverianOS $VERSION"
@@ -226,6 +254,7 @@ release() {
             --title "SeverianOS $VERSION" --notes-file "$notes" >/dev/null
         ok "DRAFT release $tag created in $repo"
     fi
+    verify_release "$tag" "$repo" "${assets[@]}"
     note "review it on GitHub, then press 'Publish release'"
 }
 
