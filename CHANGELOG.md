@@ -9,6 +9,10 @@
   (kernel included, newest 3 kept); `sev rollback` returns to one after a
   reboot. /home is not touched. New installs get an @snapshots subvolume
 - Mirrors are refreshed weekly (reflector.timer)
+- Fix: the weekly mirror refresh no longer ships a file that belongs to
+  the reflector package, which made pacman refuse every update
+  ("conflicting files"). The settings live in
+  /usr/share/severian/reflector.conf now
 - Tuning: zram-friendly memory settings, I/O scheduler by disk type
   (bfq for hard disks), journal limited to 200 MB
 - Video decoding on older Intel graphics (Haswell and earlier, e.g. ThinkPad
