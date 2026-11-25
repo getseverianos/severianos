@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# sevscratch — the scratchpad terminal (Super+`).
+#
+# One terminal that comes and goes with the same key. Putting it away only
+# hides the window; everything running inside keeps running. With tmux
+# installed the session also survives closing the window or restarting Sway:
+# the next call attaches to it again.
+set -uo pipefail
+
+id=sev-scratch
+session=scratch
+
+if [[ -z ${SWAYSOCK:-} ]]; then
+    echo "sevscratch: no Sway session found" >&2
+    exit 1
+fi
+
+window_exists() {
+    swaymsg -t get_tree 2>/dev/null \
+        | jq -e --arg id "$id" 'recurse(.nodes[]?, .floating_nodes[]?)
+                                | select(.app_id? == $id)' >/dev/null 2>&1
+}
+
+show() { swaymsg "[app_id=\"$id\"] scratchpad show" >/dev/null 2>&1; }
+
+# Already there: one key hides it, the same key brings it back.
+if window_exists; then
+    show
+    exit 0
+fi
+
+# Not there yet: start it. tmux keeps the session beyond the window's life.
+if command -v tmux >/dev/null 2>&1; then
+    setsid foot --app-id="$id" --title=scratchpad \
+        tmux new-session -A -s "$session" >/dev/null 2>&1 &
+else
+    setsid foot --app-id="$id" --title=scratchpad >/dev/null 2>&1 &
+fi
+
+# The window rule in the Sway config sends it to the scratchpad, so wait for
+# it to appear and then pull it up. Three seconds is plenty, even on an A10.
+for _ in $(seq 1 60); do
+    if window_exists; then
+        show
+        exit 0
+    fi
+    sleep 0.05
+done
+
+echo "sevscratch: the terminal did not show up" >&2
+exit 1

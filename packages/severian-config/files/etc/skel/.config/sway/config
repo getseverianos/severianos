@@ -3,6 +3,10 @@
 #  Your own changes: edit this file, or put *.conf
 #  files into ~/.config/sway/config.d/
 #  Restore the defaults: sevconfig reset sway
+#
+#  Lines starting with ## are read by sevhelp
+#  (Super+F1) and have the form
+#  ## section | what it does | key label (optional)
 # ──────────────────────────────────────────────
 set $mod Mod4
 set $left h
@@ -38,20 +42,69 @@ input type:touchpad {
 }
 seat * xcursor_theme Adwaita 24
 
-# ── Basics ────────────────────────────────────
-bindsym $mod+Return exec $term
-bindsym $mod+d exec $menu
-bindsym $mod+Shift+b exec sevbrowser
-bindsym $mod+Shift+q kill
-bindsym $mod+Shift+c reload
-bindsym $mod+Escape exec swaylock
-bindsym $mod+Shift+e exec sevpower
-bindsym $mod+F1 exec foot --app-id sevhelp -W 64x32 sh -c 'sevhelp; read -rsn1'
-bindsym $mod+F2 exec sevkeyboard
-bindsym $mod+comma exec sevsettings
+# ── Mouse ─────────────────────────────────────
+# Hold Super and drag a window with the left button to move it, with the
+# right button to resize it. Tiled windows swap places, floating ones follow
+# the pointer.
 floating_modifier $mod normal
+tiling_drag enable
+tiling_drag_threshold 9
+
+# ── Basics ────────────────────────────────────
+## start | terminal
+bindsym $mod+Return exec $term
+bindsym $mod+t exec $term
+
+## start | floating terminal
+bindsym $mod+Shift+Return exec $term --app-id sev-float
+
+## start | scratchpad terminal (the session keeps running)
+bindsym $mod+grave exec sevscratch
+
+## start | apps
+bindsym $mod+d exec $menu
+
+## start | browser
+bindsym $mod+Shift+b exec sevbrowser
+
+## start | close window
+bindsym $mod+q kill
+bindsym $mod+Shift+q kill
+
+## start | lock
+bindsym $mod+Escape exec swaylock
+
+## start | lock · log out · power
+bindsym $mod+Shift+e exec sevpower
+
+## more | reload config
+bindsym $mod+Shift+c reload
+
+## more | these shortcuts
+bindsym $mod+F1 exec foot --app-id sevhelp -W 76x46 sh -c 'sevhelp; read -rsn1'
+
+## more | keyboard layout
+bindsym $mod+F2 exec sevkeyboard
+
+## more | settings
+bindsym $mod+comma exec sevsettings
+
+# ── Single-key bindings ───────────────────────
+# Ctrl+Q and Ctrl+B are taken by Sway before the focused program sees them.
+# That is deliberate, but it means Ctrl+Q no longer quits a program by itself
+# (an editor cannot ask about unsaved work) and Ctrl+B does not reach tmux,
+# nano, emacs or a shell line editor. Put
+#   unbindsym Ctrl+q
+#   unbindsym Ctrl+b
+# into ~/.config/sway/config.d/my-keys.conf to get the keys back.
+## start | close window
+bindsym Ctrl+q kill
+
+## start | browser
+bindsym Ctrl+b exec sevbrowser
 
 # ── Focus & move ──────────────────────────────
+## windows | focus | super + h j k l
 bindsym $mod+$left focus left
 bindsym $mod+$down focus down
 bindsym $mod+$up focus up
@@ -60,6 +113,8 @@ bindsym $mod+Left focus left
 bindsym $mod+Down focus down
 bindsym $mod+Up focus up
 bindsym $mod+Right focus right
+
+## windows | move (arrows work too) | super + shift + h j k l
 bindsym $mod+Shift+$left move left
 bindsym $mod+Shift+$down move down
 bindsym $mod+Shift+$up move up
@@ -69,7 +124,28 @@ bindsym $mod+Shift+Down move down
 bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
 
+## windows | resize | super + ctrl + h j k l
+bindsym $mod+Ctrl+$left resize shrink width 40px
+bindsym $mod+Ctrl+$down resize grow height 40px
+bindsym $mod+Ctrl+$up resize shrink height 40px
+bindsym $mod+Ctrl+$right resize grow width 40px
+bindsym $mod+Ctrl+Left resize shrink width 40px
+bindsym $mod+Ctrl+Down resize grow height 40px
+bindsym $mod+Ctrl+Up resize shrink height 40px
+bindsym $mod+Ctrl+Right resize grow width 40px
+
+## windows | resize mode
+bindsym $mod+r mode "resize"
+
+# ── Scratchpad ────────────────────────────────
+## windows | put the window away
+bindsym $mod+Shift+minus move scratchpad
+
+## windows | bring it back (again: away)
+bindsym $mod+minus scratchpad show
+
 # ── Workspaces ────────────────────────────────
+## workspaces | switch | super + 1…9
 bindsym $mod+1 workspace number 1
 bindsym $mod+2 workspace number 2
 bindsym $mod+3 workspace number 3
@@ -79,6 +155,8 @@ bindsym $mod+6 workspace number 6
 bindsym $mod+7 workspace number 7
 bindsym $mod+8 workspace number 8
 bindsym $mod+9 workspace number 9
+
+## workspaces | move window there | super + shift + 1…9
 bindsym $mod+Shift+1 move container to workspace number 1
 bindsym $mod+Shift+2 move container to workspace number 2
 bindsym $mod+Shift+3 move container to workspace number 3
@@ -90,14 +168,24 @@ bindsym $mod+Shift+8 move container to workspace number 8
 bindsym $mod+Shift+9 move container to workspace number 9
 
 # ── Layout ────────────────────────────────────
+## layout | fullscreen
+bindsym $mod+space fullscreen
+bindsym $mod+f fullscreen
+
+## layout | float
+bindsym $mod+Shift+space floating toggle
+
+## layout | tiled ↔ floating
+bindsym $mod+Tab focus mode_toggle
+
+## layout | split horizontal / vertical | super + b / v
 bindsym $mod+b splith
 bindsym $mod+v splitv
-bindsym $mod+s layout stacking
+
+## layout | tabs / stack / split | super + w / s / e
 bindsym $mod+w layout tabbed
+bindsym $mod+s layout stacking
 bindsym $mod+e layout toggle split
-bindsym $mod+f fullscreen
-bindsym $mod+Shift+space floating toggle
-bindsym $mod+space focus mode_toggle
 
 mode "resize" {
     bindsym $left resize shrink width 20px
@@ -111,7 +199,6 @@ mode "resize" {
     bindsym Return mode "default"
     bindsym Escape mode "default"
 }
-bindsym $mod+r mode "resize"
 
 # ── Media, brightness, screenshots ────────────
 bindsym --locked XF86AudioRaiseVolume exec sevosd volume up
@@ -120,16 +207,33 @@ bindsym --locked XF86AudioMute exec sevosd volume mute
 bindsym --locked XF86AudioMicMute exec sevosd mic mute
 bindsym --locked XF86MonBrightnessUp exec sevosd brightness up
 bindsym --locked XF86MonBrightnessDown exec sevosd brightness down
+
+## screen | region → clipboard
 bindsym Print exec grim -g "$(slurp -b 12121499 -c b5523bff -w 2)" - | wl-copy
+
+## screen | whole screen → clipboard
 bindsym Shift+Print exec grim - | wl-copy
+
+## screen | region → ~/Pictures/Screenshots
 bindsym $mod+Print exec sevshot
+
+## screen | whole screen → file
 bindsym $mod+Shift+Print exec sevshot full
+
+## screen | record screen (again: stop)
 bindsym $mod+Shift+r exec sevrec
 
 # ── Clipboard, night light, displays, packages ─
+## more | clipboard history
 bindsym $mod+Shift+v exec sevclip
+
+## more | night light on / off
 bindsym $mod+Shift+n exec sevnight toggle
+
+## more | displays
 bindsym $mod+Shift+p exec sevdisplay
+
+## more | packages
 bindsym $mod+Shift+a exec sevpkg
 
 # ── Window rules ──────────────────────────────
@@ -137,6 +241,7 @@ for_window [app_id="sevhelp"] floating enable
 for_window [app_id="sevnet"] floating enable
 for_window [app_id="sevbt"] floating enable
 for_window [app_id="sev-float"] floating enable
+for_window [app_id="sev-scratch"] floating enable, resize set 1000 620, move position center, move scratchpad
 for_window [app_id="sevpkg"] floating enable, resize set 900 560
 for_window [app_id="polkit-gnome-authentication-agent-1"] floating enable
 for_window [app_id="sevupdate"] floating enable, resize set 900 600

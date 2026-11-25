@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased (0.4)
+
+- Keys: Super+Space is fullscreen (Super+F still works), Super+T opens a
+  terminal, Super+Shift+Return a floating one, Super+Tab switches between
+  tiled and floating
+- Ctrl+Q closes a window and Ctrl+B opens the browser (Super+Shift+Q and
+  Super+Shift+B still work). Sway takes both keys before the program sees
+  them; `unbindsym` in a `config.d` file gives them back
+- Resize without a mode: Super+Ctrl and h j k l or the arrow keys
+- Hold Super and drag a window with the mouse to move it, right button to
+  resize (tiling_drag)
+- Scratchpad: Super+Shift+- puts a window away, Super+- brings it back
+- Super+` opens the scratchpad terminal (`sevscratch`): one terminal that
+  comes and goes with the same key while everything in it keeps running.
+  With tmux installed the session even survives closing the window
+- `sevhelp` (Super+F1) now reads the Sway config that is really loaded, so
+  the list cannot drift from the keys, and your own bindings appear in it
+
 ## Unreleased (0.3)
 
 - Careful updates: `sevupdate` clears a lock left by an interrupted update,

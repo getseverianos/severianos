@@ -58,6 +58,18 @@ unbindsym Mod4+Shift+b
 
 Reload with **Super + Shift + C**.
 
+A binding of yours appears in **Super+F1** on its own. Give it a name and a
+place in the list with a marker line above it:
+
+```
+## more | file manager
+bindsym Mod4+n exec thunar
+```
+
+The form is `## section | what it does`; the sections are start, windows,
+layout, workspaces, screen and more. Without a marker the binding is listed
+under "your own bindings".
+
 - **Keyboard layout:** Super+F2 (remembered). For the console and the login
   screen: `sudo localectl set-keymap de-latin1`.
 - **Wallpaper:** `output * bg /path/to/image.png fill` in a `config.d` file.

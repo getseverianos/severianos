@@ -40,10 +40,11 @@ Every new feature has to justify its weight against these numbers.
   | `sevinstall`  | the installer (ext4 or btrfs, optional encryption)     |
   | `sevupdate`   | update the system; the bar shows pending updates       |
   | `sevconfig`   | compare your configs with the defaults, restore them   |
-  | `sevbrowser`  | the browser (Super+Shift+B)                            |
+  | `sevbrowser`  | the browser (Ctrl+B, also Super+Shift+B)               |
   | `sevkeyboard` | pick a keyboard layout (Super+F2)                      |
-  | `sevhelp`     | all shortcuts (Super+F1)                               |
+  | `sevhelp`     | the shortcuts, from your own config (Super+F1)         |
   | `sevpower`    | lock · log out · reboot · power off (Super+Shift+E)    |
+  | `sevscratch`  | scratchpad terminal that keeps running                 |
   | `sevshot`     | screenshots to ~/Pictures/Screenshots (Super+Print)    |
   | `sevbattery`  | warns at 10 % and 5 % battery                          |
   | `sevfetch`    | system info                                            |

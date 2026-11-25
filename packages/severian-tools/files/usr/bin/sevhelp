@@ -1,60 +1,242 @@
 #!/usr/bin/env bash
-# sevhelp — the essential SeverianOS shortcuts
+# sevhelp — the shortcuts, read from the Sway config that is really loaded.
+#
+# A binding appears here when the config has a marker line above it:
+#   ## section | what it does | key label (optional)
+# The key label replaces the keys in the list; use it for groups such as
+# "super + h j k l". Sections are printed in the order below, anything else
+# is appended. Bindings without a marker in your own config.d files show up
+# under "your own bindings", so nothing can quietly disappear from this list.
+set -uo pipefail
+shopt -s nullglob
 
 e=$'\e[38;2;181;82;59m'; f=$'\e[38;2;216;210;198m'
 m=$'\e[38;2;111;106;98m'; b=$'\e[38;2;201;166;107m'; r=$'\e[0m'
+SEP=$'\x1f'
+DOT=' · '
+
+order=(start windows layout workspaces screen more)
+
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}
+files=()
+[[ -r $cfg/sway/config ]] && files+=("$cfg/sway/config")
+((${#files[@]})) || files+=(/etc/skel/.config/sway/config)
+files+=(/etc/sway/config.d/*)
+user_from=${#files[@]}
+files+=("$cfg"/sway/config.d/*)
+
+declare -A var=() last=() unbound=() g_keys=()
+keys=() cmds=() grps=() mine=()
+g_sec=() g_desc=() g_label=()
+grp=0 marker_sec='' marker_desc='' marker_label='' in_mode=0
+
+pretty() {
+    local combo=$1 out='' part
+    local IFS='+'
+    for part in $combo; do
+        case $part in
+            Mod4|mod4)          part=super ;;
+            Mod1|mod1|Alt)      part=alt ;;
+            Control|Ctrl|ctrl)  part=ctrl ;;
+            Shift|shift)        part=shift ;;
+            Return)             part=enter ;;
+            Escape)             part=esc ;;
+            minus)              part='-' ;;
+            plus)               part='+' ;;
+            equal)              part='=' ;;
+            grave)              part='`' ;;
+            comma)              part=',' ;;
+            period)             part='.' ;;
+            slash)              part='/' ;;
+            semicolon)          part=';' ;;
+            apostrophe)         part="'" ;;
+            bracketleft)        part='[' ;;
+            bracketright)       part=']' ;;
+            backslash)          part='\' ;;
+            XF86*)              part=${part#XF86}; part=${part,,} ;;
+            Tab|Print|Up|Down|Left|Right|Home|End|Insert|Delete|Menu|BackSpace)
+                                part=${part,,} ;;
+            Page*|F[0-9]|F[0-9][0-9])
+                                part=${part,,} ;;
+            *)                  [[ ${#part} == 1 ]] && part=${part,,} ;;
+        esac
+        out+="${out:+ + }$part"
+    done
+    printf '%s' "$out"
+}
+
+expand() {
+    local s=$1 n
+    for n in "${!var[@]}"; do s=${s//"$n"/${var[$n]}}; done
+    printf '%s' "$s"
+}
+
+trim() {
+    local s=$1
+    s=${s#"${s%%[![:space:]]*}"}
+    s=${s%"${s##*[![:space:]]}"}
+    printf '%s' "$s"
+}
+
+i=0
+for idx in "${!files[@]}"; do
+    file=${files[$idx]}
+    [[ -r $file && -f $file ]] || continue
+    is_mine=0
+    (( idx >= user_from )) && is_mine=1
+    marker_sec=''; marker_desc=''; marker_label=''
+    while IFS= read -r line; do
+        line=$(trim "$line")
+        # Bindings inside a mode block belong to that mode, not to this list.
+        if (( in_mode )); then
+            [[ $line == '}'* ]] && in_mode=0
+            continue
+        fi
+        case $line in
+            mode\ *\{*)
+                in_mode=1 ;;
+            set\ \$*)
+                rest=${line#set }
+                var[${rest%% *}]=${rest#* } ;;
+            '##'*)
+                IFS='|' read -r marker_sec marker_desc marker_label \
+                    <<<"${line#\#\#}"
+                marker_sec=$(trim "${marker_sec:-}")
+                marker_desc=$(trim "${marker_desc:-}")
+                marker_label=$(trim "${marker_label:-}")
+                (( ++grp ))
+                g_sec[$grp]=$marker_sec
+                g_desc[$grp]=$marker_desc
+                g_label[$grp]=$marker_label ;;
+            unbindsym\ *)
+                read -ra words <<<"${line#unbindsym }"
+                for w in "${words[@]}"; do
+                    [[ $w == --* ]] && continue
+                    unbound[$(pretty "$(expand "$w")")]=1
+                    break
+                done ;;
+            bindsym\ *)
+                rest=${line#bindsym }
+                read -ra words <<<"$rest"
+                combo=''
+                for w in "${words[@]}"; do
+                    [[ $w == --* ]] && continue
+                    combo=$w
+                    break
+                done
+                [[ -n $combo ]] || continue
+                cmd=$(trim "${rest#*"$combo"}")
+                key=$(pretty "$(expand "$combo")")
+                keys[$i]=$key
+                cmds[$i]=$(expand "$cmd")
+                grps[$i]=${marker_sec:+$grp}
+                mine[$i]=$is_mine
+                last[$key]=$i
+                (( i++ )) ;;
+            *)
+                marker_sec=''; marker_desc=''; marker_label='' ;;
+        esac
+    done <"$file"
+done
+
+# Which groups still hold a binding that nothing later took over?
+for n in "${!keys[@]}"; do
+    key=${keys[$n]}
+    [[ -n ${unbound[$key]:-} ]] && continue
+    (( last[$key] == n )) || continue
+    g=${grps[$n]}
+    [[ -n $g ]] || continue
+    if [[ -z ${g_keys[$g]:-} ]]; then
+        g_keys[$g]=$key
+    else
+        [[ "$SEP${g_keys[$g]}$SEP" == *"$SEP$key$SEP"* ]] \
+            || g_keys[$g]+="$SEP$key"
+    fi
+done
 
 h() { printf '\n  %s%s%s\n' "$e" "$1" "$r"; }
-k() { printf '  %s%-24s%s %s%s\n' "$b" "$1" "$m" "$f$2" "$r"; }
+# %-30s pads by bytes, so "·" would shift the column: pad by characters.
+k() {
+    local key=$1 desc=$2 pad='' n=$(( 30 - ${#1} ))
+    (( n > 0 )) && pad=$(printf '%*s' "$n" '')
+    printf '  %s%s%s%s %s%s%s\n' "$b" "$key" "$pad" "$m" "$f" "$desc" "$r"
+}
 
-printf '\n  %s●%s %sseverian%s  %sshortcuts%s\n' "$e" "$r" "$f" "$r" "$m" "$r"
+render() {
+    printf '\n  %s●%s %sseverian%s  %sshortcuts%s\n' \
+        "$e" "$r" "$f" "$r" "$m" "$r"
 
-h "start"
-k "super + enter"          "terminal"
-k "super + d"              "apps"
-k "super + shift + b"      "browser"
-k "super + shift + q"      "close window"
-k "super + escape"         "lock"
-k "super + shift + e"      "lock · log out · power"
+    local sec g sig into label all=() live=() order_all=()
+    local -A merged=()
+    mapfile -t all < <(printf '%s\n' "${!g_keys[@]}" | sort -n)
 
-h "windows"
-k "super + h j k l"        "focus (arrows work too)"
-k "super + shift + h j k l" "move"
-k "super + f"              "fullscreen"
-k "super + shift + space"  "float"
-k "super + r"              "resize mode"
+    # Two ways to do the same thing (Super+Q and Ctrl+Q) share one line.
+    for g in "${all[@]}"; do
+        sig="${g_sec[$g]}|${g_desc[$g]}|${g_label[$g]}"
+        into=${merged[$sig]:-}
+        if [[ -n $into ]]; then
+            g_keys[$into]+="$SEP${g_keys[$g]}"
+        else
+            merged[$sig]=$g
+            live+=("$g")
+        fi
+    done
 
-h "layout"
-k "super + b / v"          "split horizontal / vertical"
-k "super + w / s / e"      "tabs / stack / split"
+    for sec in "${order[@]}"; do order_all+=("$sec"); done
+    for g in "${live[@]}"; do
+        sec=${g_sec[$g]}
+        [[ " ${order_all[*]} " == *" $sec "* ]] || order_all+=("$sec")
+    done
 
-h "workspaces"
-k "super + 1…9"            "switch"
-k "super + shift + 1…9"    "move window there"
+    for sec in "${order_all[@]}"; do
+        local head_done=0
+        for g in "${live[@]}"; do
+            [[ ${g_sec[$g]} == "$sec" ]] || continue
+            (( head_done )) || { h "$sec"; head_done=1; }
+            label=${g_label[$g]}
+            [[ -n $label ]] || label=${g_keys[$g]//$SEP/$DOT}
+            k "$label" "${g_desc[$g]}"
+        done
+    done
 
-h "more"
-k "print"                  "region → clipboard"
-k "super + print"          "region → ~/Pictures/Screenshots"
-k "super + shift + print"  "whole screen → file"
-k "super + shift + r"      "record screen (again: stop)"
-k "super + shift + v"      "clipboard history"
-k "super + shift + n"      "night light on / off"
-k "super + shift + p"      "displays"
-k "super + shift + a"      "packages"
-k "super + comma"          "settings"
-k "super + f2"             "keyboard layout"
-k "super + shift + c"      "reload config"
-k "click on the bar"       "eth/wlan: network · bt: bluetooth"
-k ""                       "vol: mute · right-click vol: mixer"
+    # Bindings of your own that carry no marker.
+    local own=0 n key cmd
+    for n in "${!keys[@]}"; do
+        (( mine[$n] )) || continue
+        [[ -z ${grps[$n]} ]] || continue
+        key=${keys[$n]}
+        [[ -n ${unbound[$key]:-} ]] && continue
+        (( last[$key] == n )) || continue
+        (( own )) || { h "your own bindings"; own=1; }
+        cmd=${cmds[$n]}
+        (( ${#cmd} > 34 )) && cmd="${cmd:0:33}…"
+        k "$key" "$cmd"
+    done
 
-h "commands"
-k "sevupdate"              "update the system"
-k "sevconfig"              "compare / restore your configs"
-k "sev"                    "how the system is doing"
-k "sev doctor / clean"     "check / free disk space"
-k "sev rollback"           "undo the last update (btrfs)"
-k "sev welcome"            "first-start setup, hardware check"
-k "sevpkg search WORD"     "find packages"
-k "sevfetch"               "system info"
+    h "the bar"
+    k "click on the bar" "eth/wlan: network · bt: bluetooth"
+    k "" "vol: mute · right-click vol: mixer"
 
-printf '\n  %spress any key to close%s\n' "$m" "$r"
+    h "commands"
+    k "sevupdate"              "update the system"
+    k "sevconfig"              "compare / restore your configs"
+    k "sev"                    "how the system is doing"
+    k "sev doctor / clean"     "check / free disk space"
+    k "sev rollback"           "undo the last update (btrfs)"
+    k "sev welcome"            "first-start setup, hardware check"
+    k "sevpkg search WORD"     "find packages"
+    k "sevfetch"               "system info"
+    k "sevscratch"             "scratchpad terminal (Super+\`)"
+
+    printf '\n  %spress any key to close%s\n' "$m" "$r"
+}
+
+out=$(render)
+rows=${LINES:-0}
+(( rows )) || rows=$(tput lines 2>/dev/null || echo 24)
+if [[ -t 1 ]] && command -v less >/dev/null 2>&1 \
+   && (( $(printf '%s\n' "$out" | wc -l) > rows )); then
+    printf '%s\n' "$out" | less -R
+else
+    printf '%s\n' "$out"
+fi
