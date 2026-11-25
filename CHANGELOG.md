@@ -16,6 +16,10 @@
   drops in and out with the same key while everything in it keeps running.
   With tmux installed the session even survives closing the window; its
   prefix there is Ctrl+A, because Ctrl+B belongs to the browser
+- `sevbench` fixes: the boot time is read again (systemd-analyze ends its
+  line with a space, so the old pattern never matched), the version comes
+  from os-release, which now carries VERSION_ID, and a reading taken while a
+  browser is open is marked as not being the baseline
 - `sevhelp` (Super+F1) now reads the Sway config that is really loaded, so
   the list cannot drift from the keys, and your own bindings appear in it
 

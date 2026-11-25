@@ -12,11 +12,18 @@ up=$(awk '{print int($1)}' /proc/uptime)
 ram=$(free -m | awk '/^Mem:/ {print $3}')
 swap=$(free -m | awk '/^Swap:/ {print $3}')
 disk=$(df -BM --output=used / | tail -n1 | tr -dc 0-9)
-boot=$(systemd-analyze 2>/dev/null | sed -n 's/.*= \([0-9.]*m\{0,1\}s\)$/\1/p; s/.*= \([0-9]*min [0-9.]*s\)$/\1/p' | head -n1)
+# systemd-analyze prints "... = 25.123s " with a trailing space, so anchoring
+# at the end of the line found nothing. Take what follows the last "= ".
+boot=$(systemd-analyze 2>/dev/null | sed -n 's/.*= //p' | head -n1 | sed 's/[[:space:]]*$//')
 pkgs=$(pacman -Qq | wc -l)
 procs=$(ps -e --no-headers | wc -l)
 model=$(cat /sys/devices/virtual/dmi/id/product_version 2>/dev/null || cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null)
-ver=$(. /etc/os-release && echo "${VERSION_ID:-?}")
+ver=$(. /etc/os-release 2>/dev/null; echo "${VERSION_ID:-}")
+[[ -n $ver ]] || ver=$(pacman -Q severian-desktop 2>/dev/null | cut -d' ' -f2)
+ver=${ver:-?}
+
+# A browser or office suite makes the memory figure useless as a baseline.
+busy=$(ps -eo comm= | grep -cE '^(firefox|chrom(e|ium)|thunderbird|soffice|code|steam)' || true)
 
 printf '\n  %s●%s sevbench  %s%s · SeverianOS %s · %s%s\n\n' "$e" "$r" "$m" "${model:-unknown}" "$ver" "$(uname -r)" "$r"
 printf '  %-10s %s MiB\n' ram "$ram" swap "$swap"
@@ -24,6 +31,10 @@ printf '  %-10s %s MiB\n' disk "$disk"
 printf '  %-10s %s\n' boot "${boot:-?}" packages "$pkgs" processes "$procs"
 if (( up < 120 )); then
     printf '\n  %suptime %ss – for comparable numbers wait until 2 minutes after login%s\n' "$m" "$up" "$r"
+fi
+if (( busy )); then
+    printf '\n  %sa browser or office app is running – "ram" is not the baseline.%s\n' "$m" "$r"
+    printf '  %sbaseline: reboot, log in, open one terminal, wait 2 minutes, run sevbench%s\n' "$m" "$r"
 fi
 echo
 

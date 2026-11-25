@@ -1,5 +1,7 @@
 NAME="SeverianOS"
 PRETTY_NAME="SeverianOS"
+VERSION="@VERSION@"
+VERSION_ID=@VERSION@
 ID=severianos
 ID_LIKE=arch
 BUILD_ID=rolling
