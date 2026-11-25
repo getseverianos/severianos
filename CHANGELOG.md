@@ -11,10 +11,11 @@
 - Resize without a mode: Super+Ctrl and h j k l or the arrow keys
 - Hold Super and drag a window with the mouse to move it, right button to
   resize (tiling_drag)
-- Scratchpad: Super+Shift+- puts a window away, Super+- brings it back
-- Super+` opens the scratchpad terminal (`sevscratch`): one terminal that
-  comes and goes with the same key while everything in it keeps running.
-  With tmux installed the session even survives closing the window
+- Super+Shift+- puts any window away, Super+- brings it back
+- Super+Alt+T opens the dropdown terminal (`sevdrop`): one terminal that
+  drops in and out with the same key while everything in it keeps running.
+  With tmux installed the session even survives closing the window; its
+  prefix there is Ctrl+A, because Ctrl+B belongs to the browser
 - `sevhelp` (Super+F1) now reads the Sway config that is really loaded, so
   the list cannot drift from the keys, and your own bindings appear in it
 

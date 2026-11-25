@@ -1,8 +1,8 @@
 # Maintainer: SeverianOS <https://github.com/getseverianos>
 pkgname=severian-tools
 pkgver=0.1.0
-pkgrel=10
-pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp, sevbattery, sevshot, sev, sevsettings, sevdisplay, sevpkg, sevosd, sevclip, sevnight, sevrec, sevsnap, sevbench, sevscratch'
+pkgrel=11
+pkgdesc='SeverianOS tools: sevfetch, sevhelp, sevupdate, sevconfig, sevkeyboard, sevpower, sevtemp, sevbattery, sevshot, sev, sevsettings, sevdisplay, sevpkg, sevosd, sevclip, sevnight, sevrec, sevsnap, sevbench, sevdrop'
 arch=('any')
 url='https://github.com/getseverianos'
 license=('GPL-3.0-or-later')
@@ -20,7 +20,7 @@ optdepends=('sway: severian-session, sevkeyboard, sevpower'
             'brightnessctl: brightness (sevosd)'
             'btrfs-progs: snapshots before updates (sevsnap)'
             'reflector: fresh mirrors when an update fails'
-            'tmux: the scratchpad terminal keeps its session (sevscratch)'
+            'tmux: the dropdown terminal keeps its session (sevdrop)'
             'libva-utils: video decoding check (sevwelcome --hw)'
             'vulkan-tools: vulkan check (sevwelcome --hw)')
 options=('!strip' '!debug')

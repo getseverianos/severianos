@@ -44,7 +44,7 @@ Every new feature has to justify its weight against these numbers.
   | `sevkeyboard` | pick a keyboard layout (Super+F2)                      |
   | `sevhelp`     | the shortcuts, from your own config (Super+F1)         |
   | `sevpower`    | lock · log out · reboot · power off (Super+Shift+E)    |
-  | `sevscratch`  | scratchpad terminal that keeps running                 |
+  | `sevdrop`     | dropdown terminal that keeps running                   |
   | `sevshot`     | screenshots to ~/Pictures/Screenshots (Super+Print)    |
   | `sevbattery`  | warns at 10 % and 5 % battery                          |
   | `sevfetch`    | system info                                            |

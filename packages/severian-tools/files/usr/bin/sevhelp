@@ -226,7 +226,7 @@ render() {
     k "sev welcome"            "first-start setup, hardware check"
     k "sevpkg search WORD"     "find packages"
     k "sevfetch"               "system info"
-    k "sevscratch"             "scratchpad terminal (Super+\`)"
+    k "sevdrop"                "dropdown terminal (Super+Alt+T)"
 
     printf '\n  %spress any key to close%s\n' "$m" "$r"
 }

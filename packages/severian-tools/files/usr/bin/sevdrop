@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# sevdrop — the dropdown terminal (Super+Alt+T).
+#
+# One terminal that drops in and out with the same key. Sending it away only
+# hides the window; everything running inside keeps running. With tmux
+# installed the session also survives closing the window or restarting Sway:
+# the next call attaches to it again. The prefix in this session is Ctrl+A,
+# because Ctrl+B opens the browser in SeverianOS (see /usr/share/severian/tmux.conf).
+set -uo pipefail
+
+id=sev-drop
+session=drop
+tmuxconf=/usr/share/severian/tmux.conf
+
+if [[ -z ${SWAYSOCK:-} ]]; then
+    echo "sevdrop: no Sway session found" >&2
+    exit 1
+fi
+
+window_exists() {
+    swaymsg -t get_tree 2>/dev/null \
+        | jq -e --arg id "$id" 'recurse(.nodes[]?, .floating_nodes[]?)
+                                | select(.app_id? == $id)' >/dev/null 2>&1
+}
+
+show() { swaymsg "[app_id=\"$id\"] scratchpad show" >/dev/null 2>&1; }
+
+# Already there: one key sends it away, the same key brings it back.
+if window_exists; then
+    show
+    exit 0
+fi
+
+# Not there yet: start it. tmux keeps the session beyond the window's life.
+if command -v tmux >/dev/null 2>&1; then
+    if [[ -r $tmuxconf ]]; then
+        setsid foot --app-id="$id" --title=dropdown \
+            tmux -f "$tmuxconf" new-session -A -s "$session" >/dev/null 2>&1 &
+    else
+        setsid foot --app-id="$id" --title=dropdown \
+            tmux new-session -A -s "$session" >/dev/null 2>&1 &
+    fi
+else
+    setsid foot --app-id="$id" --title=dropdown >/dev/null 2>&1 &
+fi
+
+# The window rule in the Sway config sends it away, so wait for the window to
+# appear and then drop it in. Three seconds is plenty, even on an A10.
+for _ in $(seq 1 60); do
+    if window_exists; then
+        show
+        exit 0
+    fi
+    sleep 0.05
+done
+
+echo "sevdrop: the terminal did not show up" >&2
+exit 1
