@@ -329,9 +329,11 @@ cmd_apply() {
     done < <(targets_tsv)
 
     if (( ${#refused[@]} )); then
-        warn "these files were changed by hand, so they stay as they are:"
+        warn "these files differ from the defaults, so they stay as they are:"
         printf '      %s\n' "${refused[@]}" >&2
-        warn "overwrite them with: sevconf apply --force   (the old version is kept)"
+        warn "see what differs:   sevconfig diff APP      (often just an older default)"
+        warn "take the new ones:  sevconfig reset APP     (your version is kept)"
+        warn "or overwrite:       sevconf apply --force"
     fi
     if (( ! ${#changed[@]} )); then
         say "nothing to change"

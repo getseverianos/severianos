@@ -16,31 +16,17 @@ set $right l
 set $term foot
 set $menu fuzzel
 
-# ── Look ──────────────────────────────────────
-font pango:JetBrains Mono 10
-default_border pixel 2
-default_floating_border pixel 2
-gaps inner 6
-gaps outer 0
+# ── Look and input ────────────────────────────
+# Colours, fonts, gaps, borders, wallpaper, cursor, touchpad and the keys for
+# terminal and browser live in config.d/50-severian.conf, which is generated
+# from your settings. Change them with sevsettings or:
+#   sevconf set look.accent 7f9a65
+# Anything here that is not generated:
 smart_borders on
 titlebar_padding 8 4
-output * bg /usr/share/backgrounds/severian/fuligin.png fill #121214
 
-#                       border   bg       text     indicator child
-client.focused          #b5523b  #b5523b  #e6e1d8  #c9a66b   #b5523b
-client.focused_inactive #2a292e  #1c1b1f  #8a857c  #2a292e   #2a292e
-client.unfocused        #1c1b1f  #1c1b1f  #6f6a62  #1c1b1f   #1c1b1f
-client.urgent           #c9a66b  #c9a66b  #121214  #c9a66b   #c9a66b
-
-# ── Input ─────────────────────────────────────
 # The keyboard layout lives in /etc/sway/config.d (set by the installer)
 # or ~/.config/sway/config.d/keyboard.conf (set by sevkeyboard).
-input type:touchpad {
-    tap enabled
-    natural_scroll enabled
-    dwt enabled
-}
-seat * xcursor_theme Adwaita 24
 
 # ── Mouse ─────────────────────────────────────
 # Hold Super and drag a window with the left button to move it, with the
@@ -51,21 +37,11 @@ tiling_drag enable
 tiling_drag_threshold 9
 
 # ── Basics ────────────────────────────────────
-## start | terminal
-bindsym $mod+Return exec $term
-bindsym $mod+t exec $term
-
-## start | floating terminal
-bindsym $mod+Shift+Return exec $term --app-id sev-float
-
 ## start | dropdown terminal (slides in, keeps its session)
 bindsym $mod+Mod1+t exec sevdrop
 
 ## start | apps
 bindsym $mod+d exec $menu
-
-## start | browser
-bindsym $mod+Shift+b exec sevbrowser
 
 ## start | close window
 bindsym $mod+q kill
@@ -90,6 +66,7 @@ bindsym $mod+F2 exec sevkeyboard
 bindsym $mod+comma exec sevsettings
 
 # ── Single-key bindings ───────────────────────
+# Ctrl+B for the browser is generated into config.d/50-severian.conf.
 # Ctrl+Q and Ctrl+B are taken by Sway before the focused program sees them.
 # That is deliberate, but it means Ctrl+Q no longer quits a program by itself
 # (an editor cannot ask about unsaved work) and Ctrl+B does not reach tmux,
@@ -100,8 +77,6 @@ bindsym $mod+comma exec sevsettings
 ## start | close window
 bindsym Ctrl+q kill
 
-## start | browser
-bindsym Ctrl+b exec sevbrowser
 
 # ── Focus & move ──────────────────────────────
 ## windows | focus | super + h j k l

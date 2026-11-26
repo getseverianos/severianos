@@ -21,6 +21,14 @@
   and the night light (`night.temp`, `night.from`, `night.to`) are settings
   now instead of numbers inside the scripts
 - The installer records hostname and time zone in /etc/severian/system.toml
+- The generated Sway drop-in owns what it generates: colours, fonts, gaps,
+  borders, wallpaper, cursor, touchpad, key repeat and the terminal/browser
+  keys are no longer in the main config as well. Sway used to warn about every
+  key bound twice, so a red bar came up on each reload. The drop-in ships in
+  /etc/skel with the defaults, so it is there before anyone runs sevconf
+- When sevconf leaves a file alone it now says how to look (`sevconfig diff
+  APP`) and how to take the new default (`sevconfig reset APP`) — an older
+  default used to look exactly like a file you had edited yourself
 
 ## Unreleased (0.5)
 
