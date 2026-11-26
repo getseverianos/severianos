@@ -1,21 +1,48 @@
 #!/usr/bin/env bash
 # sevdrop — the dropdown terminal (Super+Alt+T).
 #
-# One terminal that drops in and out with the same key. Sending it away only
-# hides the window; everything running inside keeps running. With tmux
-# installed the session also survives closing the window or restarting Sway:
-# the next call attaches to it again. The prefix in this session is Ctrl+A,
-# because Ctrl+B opens the browser in SeverianOS (see /usr/share/severian/tmux.conf).
+# One terminal that drops in from the top edge and slides back up with the
+# same key. Sending it away only hides the window; everything running inside
+# keeps running. With tmux installed the session also survives closing the
+# window or restarting Sway: the next call attaches to it again. The prefix
+# there is Ctrl+A, because Ctrl+B opens the browser (see
+# /usr/share/severian/tmux.conf).
+#
+#   sevdrop                drop in, or slide away if it is already there
+#   sevdrop --no-anim      no sliding, just appear
+#   sevdrop --height 60    share of the screen height in percent (default 45)
+#
+# Sway itself does not animate windows, so the slide is made by moving the
+# floating window step by step. Tuning, if a slow machine stutters:
+#   SEVDROP_FRAMES=10 SEVDROP_DELAY=0 sevdrop
 set -uo pipefail
 
 id=sev-drop
 session=drop
 tmuxconf=/usr/share/severian/tmux.conf
 
+anim=1
+height_pct=${SEVDROP_HEIGHT:-45}
+frames=${SEVDROP_FRAMES:-14}
+delay=${SEVDROP_DELAY:-0.008}
+
+while (( $# )); do
+    case $1 in
+        --no-anim) anim=0 ;;
+        --height)  height_pct=${2:?--height needs a number}; shift ;;
+        --help|-h) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *)         echo "sevdrop: unknown option $1" >&2; exit 2 ;;
+    esac
+    shift
+done
+
 if [[ -z ${SWAYSOCK:-} ]]; then
     echo "sevdrop: no Sway session found" >&2
     exit 1
 fi
+
+msg() { swaymsg -q "$@" >/dev/null 2>&1; }
+on()  { msg "[app_id=\"$id\"] $1"; }
 
 window_exists() {
     swaymsg -t get_tree 2>/dev/null \
@@ -23,11 +50,66 @@ window_exists() {
                                 | select(.app_id? == $id)' >/dev/null 2>&1
 }
 
-show() { swaymsg "[app_id=\"$id\"] scratchpad show" >/dev/null 2>&1; }
+window_visible() {
+    swaymsg -t get_tree 2>/dev/null \
+        | jq -e --arg id "$id" '[recurse(.nodes[]?, .floating_nodes[]?)
+                                 | select(.name? == "__i3_scratch")
+                                 | recurse(.nodes[]?, .floating_nodes[]?)
+                                 | select(.app_id? == $id)] | length == 0' \
+          >/dev/null 2>&1
+}
 
-# Already there: one key sends it away, the same key brings it back.
+# The work area of the focused screen, so the terminal sits under the bar.
+area() {
+    swaymsg -t get_workspaces 2>/dev/null \
+        | jq -r 'map(select(.focused))[0].rect
+                 | "\(.x) \(.y) \(.width) \(.height)"'
+}
+
+# Slide between two y positions with an ease-out curve.
+slide() {
+    local x=$1 from=$2 to=$3 w=$4 h=$5 i t y
+    for (( i = 1; i <= frames; i++ )); do
+        t=$(( i * 1000 / frames ))                       # 0…1000
+        # y = from + (to - from) * (1 - (1 - t)^3)
+        y=$(( from + (to - from) * (1000000000 - (1000 - t) * (1000 - t) * (1000 - t)) / 1000000000 ))
+        on "move absolute position $x $y"
+        [[ $delay == 0 ]] || sleep "$delay"
+    done
+    on "move absolute position $x $to"
+}
+
+read -r ax ay aw ah <<<"$(area)"
+if [[ -z ${ah:-} || $ah == null ]]; then
+    ax=0; ay=0; aw=1280; ah=720
+fi
+w=$aw
+h=$(( ah * height_pct / 100 ))
+x=$ax
+y_in=$ay
+y_out=$(( ay - h - 4 ))
+
 if window_exists; then
-    show
+    if window_visible; then
+        # slide away, then hide
+        if (( anim )); then
+            on "resize set width ${w}px height ${h}px"
+            slide "$x" "$y_in" "$y_out" "$w" "$h"
+        fi
+        on "scratchpad show"
+        on "move absolute position $x $y_in"
+        exit 0
+    fi
+    # hidden: put it above the edge first, so it does not flash in the middle
+    (( anim )) && on "move absolute position $x $y_out"
+    on "scratchpad show"
+    on "resize set width ${w}px height ${h}px"
+    if (( anim )); then
+        on "move absolute position $x $y_out"
+        slide "$x" "$y_out" "$y_in" "$w" "$h"
+    else
+        on "move absolute position $x $y_in"
+    fi
     exit 0
 fi
 
@@ -48,7 +130,15 @@ fi
 # appear and then drop it in. Three seconds is plenty, even on an A10.
 for _ in $(seq 1 60); do
     if window_exists; then
-        show
+        (( anim )) && on "move absolute position $x $y_out"
+        on "scratchpad show"
+        on "resize set width ${w}px height ${h}px"
+        if (( anim )); then
+            on "move absolute position $x $y_out"
+            slide "$x" "$y_out" "$y_in" "$w" "$h"
+        else
+            on "move absolute position $x $y_in"
+        fi
         exit 0
     fi
     sleep 0.05

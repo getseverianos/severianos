@@ -58,7 +58,7 @@ bindsym $mod+t exec $term
 ## start | floating terminal
 bindsym $mod+Shift+Return exec $term --app-id sev-float
 
-## start | dropdown terminal (the session keeps running)
+## start | dropdown terminal (slides in, keeps its session)
 bindsym $mod+Mod1+t exec sevdrop
 
 ## start | apps
@@ -241,7 +241,8 @@ for_window [app_id="sevhelp"] floating enable
 for_window [app_id="sevnet"] floating enable
 for_window [app_id="sevbt"] floating enable
 for_window [app_id="sev-float"] floating enable
-for_window [app_id="sev-drop"] floating enable, resize set 1000 620, move position center, move scratchpad
+# sevdrop sets size and position itself, so it can slide in from the top
+for_window [app_id="sev-drop"] floating enable, move scratchpad
 for_window [app_id="sevpkg"] floating enable, resize set 900 560
 for_window [app_id="polkit-gnome-authentication-agent-1"] floating enable
 for_window [app_id="sevupdate"] floating enable, resize set 900 600

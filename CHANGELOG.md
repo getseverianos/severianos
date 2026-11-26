@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased (0.5)
+
+- The dropdown terminal drops down: it sits at the top edge across the full
+  width of the work area, 45 % of the screen high, and slides in and out
+  (ease-out, about 150 ms). Sway animates nothing by itself, so `sevdrop`
+  moves the window step by step. `sevdrop --no-anim` turns it off,
+  `--height 60` makes it taller, SEVDROP_FRAMES and SEVDROP_DELAY tune it
+
 ## Unreleased (0.4)
 
 - Keys: Super+Space is fullscreen (Super+F still works), Super+T opens a
