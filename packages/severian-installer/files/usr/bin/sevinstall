@@ -456,6 +456,18 @@ fi
 # the sync databases came from the live medium – let the new system fetch its own
 rm -f "$TARGET"/var/lib/pacman/sync/severian.*
 
+# The settings of this machine, in the one place that owns them from now on.
+# sevconf reads this file; generated files are written on first use.
+install -d -m 755 "$TARGET/etc/severian"
+{
+    printf '# SeverianOS · settings of this machine · written by the installer\n'
+    printf '# Change one: sudo sevconf set --system KEY VALUE   ·  list: sevconf list\n'
+    printf 'system.hostname = "%s"\n' "$HOST"
+    printf 'system.timezone = "%s"\n' "$TIMEZONE"
+} > "$TARGET/etc/severian/system.toml"
+chmod 644 "$TARGET/etc/severian/system.toml"
+ok "settings recorded in /etc/severian/system.toml"
+
 ch systemctl enable NetworkManager.service iwd.service greetd.service bluetooth.service \
     power-profiles-daemon.service systemd-timesyncd.service systemd-oomd.service \
     fstrim.timer paccache.timer reflector.timer >/dev/null

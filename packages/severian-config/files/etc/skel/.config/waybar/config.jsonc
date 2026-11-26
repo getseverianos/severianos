@@ -6,8 +6,7 @@
   "spacing": 0,
   "modules-left": ["custom/sev", "sway/workspaces", "sway/mode"],
   "modules-center": ["clock"],
-  "modules-right": ["custom/updates", "cpu", "memory", "custom/temp", "network",
-                    "bluetooth", "sway/language", "pulseaudio", "battery"],
+  "modules-right": ["custom/updates", "cpu", "memory", "custom/temp", "network", "bluetooth", "sway/language", "pulseaudio", "battery"],
 
   "custom/sev": {
     "exec": "sev waybar",

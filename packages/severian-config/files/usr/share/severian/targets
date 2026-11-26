@@ -1,0 +1,16 @@
+# SeverianOS · where generated files go
+#   template | destination | scope | reload
+# ~ is the user's home. reload: sway, waybar, mako, idle, night, logind, none
+sway.conf            | ~/.config/sway/config.d/50-severian.conf | user   | sway
+foot.ini             | ~/.config/foot/foot.ini                  | user   | none
+fuzzel.ini           | ~/.config/fuzzel/fuzzel.ini              | user   | none
+mako.config          | ~/.config/mako/config                    | user   | mako
+swaylock.config      | ~/.config/swaylock/config                | user   | none
+swaynag.config       | ~/.config/swaynag/config                 | user   | none
+waybar.config.jsonc  | ~/.config/waybar/config.jsonc            | user   | waybar
+waybar.style.css     | ~/.config/waybar/style.css               | user   | waybar
+gtk3.ini             | ~/.config/gtk-3.0/settings.ini           | user   | none
+gtk4.ini             | ~/.config/gtk-4.0/settings.ini           | user   | none
+idle.conf            | ~/.config/sev/idle.conf                  | user   | idle
+night.conf           | ~/.config/sev/night.conf                 | user   | night
+logind-lid.conf      | /etc/systemd/logind.conf.d/50-severian.conf | system | logind

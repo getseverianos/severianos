@@ -219,6 +219,7 @@ render() {
 
     h "commands"
     k "sevupdate"              "update the system"
+    k "sevconf list / set"     "every setting in one place"
     k "sevconfig"              "compare / restore your configs"
     k "sev"                    "how the system is doing"
     k "sev doctor / clean"     "check / free disk space"

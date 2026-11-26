@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # sevsettings — one menu for the everyday settings of SeverianOS.
 # Uses fuzzel for choices and foot for tools that need a terminal.
-# Settings that must survive a restart go to
-#   ~/.config/sway/config.d/90-sevsettings.conf
+# Everything that must survive a restart goes through sevconf, which writes
+#   ~/.config/severian/user.toml
+# and generates the config files from it.
 set -uo pipefail
 
 SWAYD=${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d
@@ -14,15 +15,6 @@ pick() {  # $1 prompt, choices on stdin
 say() { notify-send -a SeverianOS "Settings" "$1" 2>/dev/null || echo "$1"; }
 term() { exec foot --app-id sev-float -W 80x24 "$@"; }
 has() { command -v "$1" >/dev/null; }
-
-# remember one sway line under a key, apply it now.
-# sway allows comments only on their own line, so the key sits above it.
-persist() {  # $1 key, $2 sway command
-    mkdir -p "$SWAYD"; touch "$SWAYF"
-    sed -i -e "/^# sev:$1\$/,+1d" -e "/ # sev:$1\$/d" "$SWAYF"
-    printf '# sev:%s\n%s\n' "$1" "$2" >>"$SWAYF"
-    swaymsg "$2" >/dev/null
-}
 
 # --- sections ------------------------------------------------------------
 network() { exec foot --app-id sevnet -W 80x24 nmtui; }
@@ -53,16 +45,42 @@ display() { exec sevdisplay; }
 
 keyboard() { exec sevkeyboard; }
 
+# older versions kept touchpad lines in 90-sevsettings.conf, which loads after
+# the generated file and would win – drop them when we touch this menu
+unpersist() { [[ -f $SWAYF ]] && sed -i -e "/^# sev:$1\$/,+1d" -e "/ # sev:$1\$/d" "$SWAYF"; }
+
 touchpad() {
     local c
     c=$(printf '%s\n' "Tap to click on" "Tap to click off" "Natural scroll on" "Natural scroll off" | pick Touchpad) || return
+    unpersist tap; unpersist nat
     case $c in
-        "Tap to click on")    persist tap "input type:touchpad tap enabled" ;;
-        "Tap to click off")   persist tap "input type:touchpad tap disabled" ;;
-        "Natural scroll on")  persist nat "input type:touchpad natural_scroll enabled" ;;
-        "Natural scroll off") persist nat "input type:touchpad natural_scroll disabled" ;;
+        "Tap to click on")    sevconf set input.touchpad.tap enabled >/dev/null; say "tap to click: on" ;;
+        "Tap to click off")   sevconf set input.touchpad.tap disabled >/dev/null; say "tap to click: off" ;;
+        "Natural scroll on")  sevconf set input.touchpad.natural_scroll enabled >/dev/null; say "natural scroll: on" ;;
+        "Natural scroll off") sevconf set input.touchpad.natural_scroll disabled >/dev/null; say "natural scroll: off" ;;
     esac
 }
+
+appearance() {
+    local sec v
+    sec=$(printf '%s\n' "Accent colour" "Font size" "Gaps" "Bar position" | pick Appearance) || return
+    case $sec in
+        "Accent colour")
+            v=$(printf '%s\n' "ember b5523b" "green 7f9a65" "gold c9a66b" "blue 6b8299" "violet 9a7aa0" | pick Accent) || return
+            sevconf set look.accent "${v##* }" >/dev/null && say "accent: ${v%% *}" ;;
+        "Font size")
+            v=$(printf '%s\n' 9 10 11 12 14 | pick "Font size") || return
+            sevconf set look.font_size "$v" >/dev/null && say "font size: $v (terminals already open keep theirs)" ;;
+        Gaps)
+            v=$(printf '%s\n' 0 4 6 8 12 | pick "Gap between windows") || return
+            sevconf set look.gaps "$v" >/dev/null && say "gaps: $v" ;;
+        "Bar position")
+            v=$(printf '%s\n' top bottom | pick "Bar position") || return
+            sevconf set bar.position "$v" >/dev/null && say "bar: $v" ;;
+    esac
+}
+
+all_settings() { exec foot --app-id sev-float -W 100x40 sh -c 'sevconf list; echo; printf "  change one: sevconf set KEY VALUE   ·  edit the file: sevconf edit\n\n  press any key"; read -rsn1'; }
 
 power() {
     if has powerprofilesctl; then
@@ -125,9 +143,10 @@ reset() {
 }
 
 # --- main ----------------------------------------------------------------
-sections=(network bluetooth sound display "night light" keyboard touchpad power clipboard packages "default apps" ember update about reset)
+sections=(appearance network bluetooth sound display "night light" keyboard touchpad power clipboard packages "default apps" ember update "all settings" about reset)
 choice=$(printf '%s\n' "${sections[@]}" | pick settings) || exit 0
 case $choice in
+    appearance) appearance ;; "all settings") all_settings ;;
     network) network ;; bluetooth) bluetooth ;; sound) sound ;; display) display ;;
     "night light") night ;; clipboard) clipboard ;; packages) exec sevpkg ;;
     keyboard) keyboard ;; touchpad) touchpad ;; power) power ;; "default apps") defaults ;;

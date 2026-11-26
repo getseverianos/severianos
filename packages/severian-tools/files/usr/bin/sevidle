@@ -1,14 +1,31 @@
 #!/bin/sh
 # sevidle — idle handling for SeverianOS.
-# Installed system: lock after 10 min, screen off after 15 min, lock before sleep.
-# Live medium: the live user has no password, so never lock – only turn the screen off.
+# The times come from the settings:
+#   sevconf set idle.lock_min 15
+#   sevconf set idle.screen_off_min 20
+#   sevconf set idle.sleep_min 60     (0 turns a step off)
+# Live medium: the live user has no password, so never lock – only turn the
+# screen off.
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/sev/idle.conf"
+LOCK_MIN=10
+SCREEN_OFF_MIN=15
+SLEEP_MIN=0
+[ -r "$CONF" ] && . "$CONF"
+
+off_cmd='swaymsg "output * power off"'
+on_cmd='swaymsg "output * power on"'
 
 if [ -d /run/archiso ]; then
+    [ "$SCREEN_OFF_MIN" -gt 0 ] || SCREEN_OFF_MIN=15
     exec swayidle -w \
-        timeout 900 'swaymsg "output * power off"' resume 'swaymsg "output * power on"'
+        timeout $((SCREEN_OFF_MIN * 60)) "$off_cmd" resume "$on_cmd"
 fi
 
-exec swayidle -w \
-    timeout 600 'swaylock -f' \
-    timeout 900 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
-    before-sleep 'swaylock -f'
+set -- -w
+[ "$LOCK_MIN" -gt 0 ]       && set -- "$@" timeout $((LOCK_MIN * 60)) 'swaylock -f'
+[ "$SCREEN_OFF_MIN" -gt 0 ] && set -- "$@" timeout $((SCREEN_OFF_MIN * 60)) "$off_cmd" resume "$on_cmd"
+[ "$SLEEP_MIN" -gt 0 ]      && set -- "$@" timeout $((SLEEP_MIN * 60)) 'systemctl suspend'
+set -- "$@" before-sleep 'swaylock -f'
+
+exec swayidle "$@"

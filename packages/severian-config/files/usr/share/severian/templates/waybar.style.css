@@ -1,0 +1,54 @@
+/* SeverianOS · Waybar · Fuligin */
+* {
+  font-family: "{{look.font}}", "{{look.font_fallback}}", monospace;
+  font-size: {{look.bar_font_size}}px;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+}
+window#waybar {
+  background: #{{look.bg}};
+  color: #{{look.text}};
+  border-bottom: 1px solid #{{look.line}};
+}
+tooltip {
+  background: #{{look.bg}};
+  border: 1px solid #{{look.accent}};
+  border-radius: {{look.radius}}px;
+}
+tooltip label { color: #{{look.text}}; }
+
+#custom-sev {
+  padding: 0 10px 0 12px;
+  color: #{{look.accent}};
+}
+#custom-sev.awake   { color: #{{look.gold}}; }
+#custom-sev.worried { color: #{{look.accent_bright}}; }
+#custom-sev:hover   { color: #{{look.text_bright}}; }
+
+#workspaces button {
+  padding: 0 8px;
+  color: #{{look.muted}};
+  background: transparent;
+}
+#workspaces button:hover { color: #{{look.text}}; background: #{{look.surface}}; }
+#workspaces button.focused {
+  color: #{{look.text_bright}};
+  box-shadow: inset 0 -2px #{{look.accent}};
+}
+#workspaces button.urgent { color: #{{look.gold}}; }
+#mode { padding: 0 10px; color: #{{look.bg}}; background: #{{look.accent}}; }
+
+#clock { color: #{{look.text_bright}}; }
+#custom-updates, #cpu, #memory, #custom-temp, #network, #bluetooth, #language,
+#pulseaudio, #battery, #clock {
+  padding: 0 10px;
+}
+#battery { padding-right: 14px; }
+#custom-updates { color: #{{look.gold}}; }
+#language { color: #{{look.muted3}}; }
+#custom-temp.critical, #battery.critical { color: #{{look.accent}}; }
+#battery.warning { color: #{{look.gold}}; }
+#battery.charging { color: #{{look.green}}; }
+#pulseaudio.muted, #network.disconnected, #bluetooth.off, #bluetooth.disabled { color: #{{look.muted}}; }
+#bluetooth.connected { color: #{{look.text}}; }

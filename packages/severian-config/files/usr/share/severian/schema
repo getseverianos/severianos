@@ -1,0 +1,81 @@
+# SeverianOS · settings schema
+#
+# One line per setting:  key | type | default | scope | description
+#   type   string, int, bool, color (bare hex, no #), path, list, enum:a,b,c
+#   scope  user    settings a user may change
+#          system  settings that belong to the machine (need root)
+#
+# Everything the system generates comes from here. Adding a setting means
+# adding one line and using @key@ in a template.
+
+# ── Look ──────────────────────────────────────
+look.accent        | color  | b5523b | user   | accent colour, the ember
+look.accent_bright | color  | d06a50 | user   | brighter accent, for warnings
+look.gold          | color  | c9a66b | user   | second accent, for attention
+look.green         | color  | 7f9a65 | user   | charging, success
+look.bg            | color  | 121214 | user   | background
+look.surface       | color  | 1c1b1f | user   | surface behind widgets
+look.surface2      | color  | 2a292e | user   | second surface, selections
+look.line          | color  | 1f1e22 | user   | hairlines
+look.text          | color  | d8d2c6 | user   | text
+look.text_bright   | color  | e6e1d8 | user   | emphasised text
+look.muted         | color  | 6f6a62 | user   | muted text
+look.muted2        | color  | 46444a | user   | more muted
+look.muted3        | color  | 8a857c | user   | muted, but readable
+look.font          | string | JetBrains Mono | user | monospace font everywhere
+look.font_fallback | string | DejaVu Sans Mono | user | fallback for the bar
+look.ui_font       | string | Noto Sans | user | font for GTK programs
+look.font_size     | int    | 10 | user | size of the monospace font
+look.ui_font_size  | int    | 10 | user | size of the GTK font
+look.menu_font_size| int    | 11 | user | size in the app launcher
+look.bar_font_size | int    | 12 | user | size in the bar, in pixels
+look.gaps          | int    | 6  | user | gap between windows
+look.gaps_outer    | int    | 0  | user | gap to the screen edge
+look.border        | int    | 2  | user | window border width
+look.radius        | int    | 6  | user | corner radius of popups
+look.pad           | int    | 10 | user | padding inside the terminal
+look.lock_radius   | int    | 64 | user | radius of the lock screen ring
+look.wallpaper     | path   | /usr/share/backgrounds/severian/fuligin.png | user | background image
+look.gtk_theme     | string | Adwaita-dark | user | GTK theme
+look.icon_theme    | string | Adwaita | user | icon theme
+look.cursor_theme  | string | Adwaita | user | cursor theme
+look.cursor_size   | int    | 24 | user | cursor size
+
+# ── Input ─────────────────────────────────────
+# The keyboard layout stays with sevkeyboard, which writes its own file in
+# ~/.config/sway/config.d/ and therefore loads after this one.
+input.touchpad.tap            | enum:enabled,disabled | enabled | user | tap to click
+input.touchpad.natural_scroll | enum:enabled,disabled | enabled | user | scroll like on a phone
+input.touchpad.dwt            | enum:enabled,disabled | enabled | user | ignore the touchpad while typing
+input.repeat_delay            | int  | 600 | user | ms before a held key repeats
+input.repeat_rate             | int  | 25  | user | repeats per second
+
+# ── Bar ───────────────────────────────────────
+bar.position       | enum:top,bottom | top | user | where the bar sits
+bar.height         | int  | 24 | user | height of the bar
+bar.clock_format   | string | {:%a %d %b  %H:%M} | user | clock, strftime in braces
+bar.modules_left   | list | ["custom/sev", "sway/workspaces", "sway/mode"] | user | left side
+bar.modules_center | list | ["clock"] | user | middle
+bar.modules_right  | list | ["custom/updates", "cpu", "memory", "custom/temp", "network", "bluetooth", "sway/language", "pulseaudio", "battery"] | user | right side
+
+# ── Programs ──────────────────────────────────
+apps.terminal          | string | foot | user | terminal for Super+Return and Super+T
+apps.terminal_floating | string | foot --app-id sev-float | user | command for the floating terminal
+apps.browser           | string | sevbrowser | user | browser for Ctrl+B
+
+# ── Idle and power ────────────────────────────
+idle.lock_min       | int | 10 | user | minutes until the screen locks, 0 = never
+idle.screen_off_min | int | 15 | user | minutes until the screen turns off, 0 = never
+idle.sleep_min      | int | 0  | user | minutes until the machine sleeps, 0 = never
+
+# ── Night light ───────────────────────────────
+# Whether it is on stays a switch (sevnight auto|always|off); these are its numbers.
+night.temp | int    | 4000  | user | colour temperature at night, in kelvin
+night.from | string | 20:00 | user | warm from
+night.to   | string | 07:00 | user | warm until
+
+# ── Machine ───────────────────────────────────
+power.lid    | enum:suspend,lock,ignore,hibernate | suspend | system | closing the lid on battery
+power.lid_ac | enum:suspend,lock,ignore,hibernate | suspend | system | closing the lid on mains power
+system.hostname | string |  | system | name of the machine, empty = leave alone
+system.timezone | string |  | system | time zone, empty = leave alone

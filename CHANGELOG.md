@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased (0.6)
+
+- One place for all settings: `/etc/severian/system.toml` for the machine,
+  `~/.config/severian/user.toml` for you. Everything else is generated from
+  them — the Sway drop-in, Waybar, foot, fuzzel, mako, swaylock, swaynag, GTK,
+  the idle times and the night light
+- `sevconf list | get | set | unset | diff | apply | undo | export | edit`;
+  `sevconf set look.accent 7f9a65` changes the accent in eight files at once
+- Settings are safe to use: a file changed by hand is never overwritten
+  without `--force`, `sevconf undo` goes a step back, and if Sway refuses the
+  result the previous files come back by themselves
+- `sevconf verify-defaults` proves that the defaults render exactly the files
+  the packages ship, so updating changes nobody's system by itself
+- `sevsettings` gained an appearance menu (accent, font size, gaps, bar
+  position) and writes through `sevconf` instead of its own Sway file
+- `sevconfig status` now tells "settings" (your sevconf values are in there)
+  apart from "changed" (you edited the file by hand)
+- The idle times (`idle.lock_min`, `idle.screen_off_min`, `idle.sleep_min`)
+  and the night light (`night.temp`, `night.from`, `night.to`) are settings
+  now instead of numbers inside the scripts
+- The installer records hostname and time zone in /etc/severian/system.toml
+
 ## Unreleased (0.5)
 
 - The dropdown terminal drops down: it sits at the top edge across the full

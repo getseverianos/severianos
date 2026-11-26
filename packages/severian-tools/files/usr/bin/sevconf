@@ -1,0 +1,520 @@
+#!/usr/bin/env bash
+# sevconf — one place for all SeverianOS settings.
+#
+# Settings live in two files and nowhere else:
+#   /etc/severian/system.toml            the machine (needs root)
+#   ~/.config/severian/user.toml         you
+# Everything else is generated from them: the Sway drop-in, Waybar, foot,
+# fuzzel, mako, swaylock, swaynag, GTK, the idle times, the night light.
+# Generated files say so in their first line. Your own files in
+# ~/.config/sway/config.d/ load afterwards and always win.
+#
+#   sevconf list [prefix]          what is set, and where it comes from
+#   sevconf get KEY
+#   sevconf set KEY VALUE          --system for machine settings
+#   sevconf unset KEY
+#   sevconf diff                   what applying would change
+#   sevconf apply                  write the files and reload
+#   sevconf undo                   back to the files from before
+#   sevconf export                 the effective settings as TOML
+#   sevconf edit                   open the file in $EDITOR, then apply
+#   sevconf schema                 every key with type and default
+#   sevconf verify-defaults        prove the defaults match the shipped files
+#
+# The file format is TOML with one dotted key per line:
+#   look.accent = "7f9a65"
+set -uo pipefail
+
+SHARE=/usr/share/severian
+SCHEMA=$SHARE/schema
+TARGETS=$SHARE/targets
+TPL=$SHARE/templates
+SYSFILE=/etc/severian/system.toml
+USRFILE=${XDG_CONFIG_HOME:-$HOME/.config}/severian/user.toml
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/severian
+GEN=$STATE/gen
+MANIFEST=$STATE/manifest
+SKEL=/etc/skel
+
+e=$'\e[38;2;181;82;59m'; f=$'\e[38;2;216;210;198m'
+m=$'\e[38;2;111;106;98m'; b=$'\e[38;2;201;166;107m'; r=$'\e[0m'
+
+say()  { printf '  %s\n' "$*"; }
+head_() { printf '\n  %s%s%s\n\n' "$e" "$1" "$r"; }
+warn() { printf '  %s!%s %s\n' "$b" "$r" "$*" >&2; }
+die()  { printf '  %serror%s %s\n' "$e" "$r" "$*" >&2; exit 1; }
+
+[[ -r $SCHEMA  ]] || die "$SCHEMA is missing"
+[[ -r $TARGETS ]] || die "$TARGETS is missing"
+
+system=0
+tmp=
+cleanup() { [[ -n $tmp && -d $tmp ]] && rm -rf "$tmp"; }
+trap cleanup EXIT
+
+# ── schema ────────────────────────────────────
+# key \t type \t default \t scope
+schema_tsv() {
+    awk -F'|' '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        {
+            for (i = 1; i <= 4; i++) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $i) }
+            print $1 "\t" $2 "\t" $3 "\t" $4
+        }' "$SCHEMA"
+}
+
+field() { schema_tsv | awk -F'\t' -v k="$1" -v n="$2" '$1 == k { print $n; found = 1 } END { exit !found }'; }
+known()  { schema_tsv | awk -F'\t' -v k="$1" '$1 == k { found = 1 } END { exit !found }'; }
+
+# ── value files ───────────────────────────────
+parse_file() {
+    [[ -r $1 ]] || return 0
+    awk '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        {
+            p = index($0, "=")
+            if (p == 0) next
+            k = substr($0, 1, p - 1); v = substr($0, p + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", k)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            if (v ~ /^".*"$/) v = substr(v, 2, length(v) - 2)
+            print k "\t" v
+        }' "$1"
+}
+
+# effective map: defaults, then system, then (unless --defaults-only) user
+build_map() {
+    # never write to $tmp/map here: callers redirect our output into it
+    local only_defaults=${1:-0} out
+    out=$(mktemp "$tmp/build.XXXXXX")
+    schema_tsv | awk -F'\t' '{ print $1 "\t" $3 }' > "$out"
+    if (( ! only_defaults )); then
+        local src
+        for src in "$SYSFILE" "$USRFILE"; do
+            [[ -r $src ]] || continue
+            parse_file "$src" | while IFS=$'\t' read -r k v; do
+                known "$k" || { warn "unknown setting in ${src/#$HOME/\~}: $k"; continue; }
+                printf '%s\t%s\n' "$k" "$v"
+            done >> "$out"
+        done
+    fi
+    # last wins
+    awk -F'\t' '{ V[$1] = $2 } END { for (k in V) print k "\t" V[k] }' "$out"
+    rm -f "$out"
+}
+
+value_of() { awk -F'\t' -v k="$1" '$1 == k { print $2 }' "$tmp/map"; }
+
+has_key() { awk -F'\t' -v k="$2" '$1 == k { found = 1 } END { exit !found }' <(parse_file "$1"); }
+
+source_of() {
+    if has_key "$USRFILE" "$1"; then echo you
+    elif has_key "$SYSFILE" "$1"; then echo machine
+    else echo default; fi
+}
+
+validate() {
+    local k=$1 v=$2 type
+    type=$(field "$k" 2) || die "unknown setting: $k"
+    case $type in
+        color)   [[ $v =~ ^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$ ]] \
+                     || die "$k must be a hex colour without #, for example b5523b" ;;
+        int)     [[ $v =~ ^-?[0-9]+$ ]] || die "$k must be a whole number" ;;
+        bool)    [[ $v == true || $v == false ]] || die "$k must be true or false" ;;
+        list)    [[ $v == \[*\] ]] || die "$k must be a list, for example [\"clock\"]" ;;
+        enum:*)  local allowed=${type#enum:}
+                 [[ ,$allowed, == *,$v,* ]] || die "$k must be one of: ${allowed//,/, }" ;;
+        path)    [[ $v == /* || $v == ~* ]] || die "$k must be an absolute path" ;;
+    esac
+}
+
+quote_for() {
+    local type=$1 v=$2
+    case $type in
+        int|bool|list) printf '%s' "$v" ;;
+        *)             printf '"%s"' "$v" ;;
+    esac
+}
+
+# ── targets ───────────────────────────────────
+targets_tsv() {
+    awk -F'|' -v home="$HOME" '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        {
+            for (i = 1; i <= 4; i++) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $i) }
+            dest = $2
+            sub(/^~/, home, dest)
+            print $1 "\t" dest "\t" $3 "\t" $4
+        }' "$TARGETS"
+}
+
+in_scope() {
+    case $1 in
+        system) (( system )) ;;
+        user)   (( ! system )) ;;
+        *)      false ;;
+    esac
+}
+
+render() {
+    local template=$1 mapfile=$2
+    awk -v mapfile="$mapfile" '
+        BEGIN {
+            while ((getline line < mapfile) > 0) {
+                p = index(line, "\t")
+                V[substr(line, 1, p - 1)] = substr(line, p + 1)
+            }
+        }
+        {
+            out = ""; rest = $0
+            while (match(rest, /\{\{[a-zA-Z0-9_.]+\}\}/)) {
+                key = substr(rest, RSTART + 2, RLENGTH - 4)
+                if (!(key in V)) {
+                    printf("unknown key {{%s}}\n", key) > "/dev/stderr"
+                    exit 3
+                }
+                out = out substr(rest, 1, RSTART - 1) V[key]
+                rest = substr(rest, RSTART + RLENGTH)
+            }
+            print out rest
+        }' "$template"
+}
+
+check_file() {
+    local name=$1 file=$2
+    case $name in
+        *.jsonc|*.json)
+            command -v jq >/dev/null || return 0
+            sed 's|^[[:space:]]*//.*$||' "$file" | jq empty 2>/dev/null \
+                || die "the generated $name is not valid JSON — nothing was changed" ;;
+    esac
+}
+
+sha() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+
+ours() {
+    local dest=$1 want
+    [[ -r $MANIFEST ]] || return 1
+    want=$(awk -F'\t' -v d="$dest" '$1 == d { print $2 }' "$MANIFEST")
+    [[ -n $want && $want == "$(sha "$dest")" ]]
+}
+
+# ── render everything into $tmp/new, pristine into $tmp/old_default ──
+prepare() {
+    tmp=${tmp:-$(mktemp -d)}
+    mkdir -p "$tmp/new" "$tmp/pristine"
+    build_map 0 > "$tmp/map"
+    build_map 1 > "$tmp/map.pristine"
+    local name dest scope reload
+    while IFS=$'\t' read -r name dest scope reload; do
+        in_scope "$scope" || continue
+        [[ -r $TPL/$name ]] || die "template $name is missing"
+        render "$TPL/$name" "$tmp/map" > "$tmp/new/$name" || die "could not render $name"
+        check_file "$name" "$tmp/new/$name"
+        render "$TPL/$name" "$tmp/map.pristine" > "$tmp/pristine/$name"
+    done < <(targets_tsv)
+}
+
+# ── commands ──────────────────────────────────
+cmd_list() {
+    local prefix=${1:-} k type def scope val src
+    tmp=$(mktemp -d); build_map 0 > "$tmp/map"
+    head_ "settings"
+    while IFS=$'\t' read -r k type def scope; do
+        [[ -z $prefix || $k == "$prefix"* ]] || continue
+        val=$(value_of "$k"); src=$(source_of "$k")
+        case $src in
+            you)     printf '  %s%-30s%s %s%-28s%s %syou%s\n'     "$b" "$k" "$r" "$f" "$val" "$r" "$e" "$r" ;;
+            machine) printf '  %s%-30s%s %s%-28s%s %smachine%s\n' "$b" "$k" "$r" "$f" "$val" "$r" "$e" "$r" ;;
+            *)       printf '  %s%-30s%s %s%-28s%s %sdefault%s\n' "$b" "$k" "$r" "$m" "$val" "$r" "$m" "$r" ;;
+        esac
+    done < <(schema_tsv)
+    echo
+}
+
+cmd_get() {
+    [[ $# -ge 1 ]] || die "sevconf get KEY"
+    known "$1" || die "unknown setting: $1"
+    tmp=$(mktemp -d); build_map 0 > "$tmp/map"
+    value_of "$1"
+}
+
+cmd_set() {
+    [[ $# -ge 2 ]] || die "sevconf set KEY VALUE"
+    local k=$1 v=$2 type scope file
+    known "$k" || die "unknown setting: $k"
+    scope=$(field "$k" 4); type=$(field "$k" 2)
+    validate "$k" "$v"
+    if [[ $scope == system ]]; then
+        (( system )) || die "$k belongs to the machine: sudo sevconf set --system $k $v"
+        (( EUID == 0 )) || die "that needs root: sudo sevconf set --system $k $v"
+        file=$SYSFILE
+    else
+        (( system )) && die "$k is yours, not the machine's — leave out --system"
+        file=$USRFILE
+    fi
+    mkdir -p "${file%/*}"
+    [[ -f $file ]] || printf '# SeverianOS settings. One dotted key per line.\n' > "$file"
+    local quoted; quoted=$(quote_for "$type" "$v")
+    if has_key "$file" "$k"; then
+        awk -v k="$k" -v line="$k = $quoted" '
+            {
+                p = index($0, "=")
+                if (p > 0) {
+                    key = substr($0, 1, p - 1)
+                    gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+                    if (key == k) { print line; next }
+                }
+                print
+            }' "$file" > "$file.new" && mv "$file.new" "$file"
+    else
+        printf '%s = %s\n' "$k" "$quoted" >> "$file"
+    fi
+    say "$k = $v"
+    cmd_apply
+}
+
+cmd_unset() {
+    [[ $# -ge 1 ]] || die "sevconf unset KEY"
+    local k=$1 file
+    known "$k" || die "unknown setting: $k"
+    file=$USRFILE; (( system )) && file=$SYSFILE
+    [[ -f $file ]] || die "nothing set in ${file/#$HOME/\~}"
+    has_key "$file" "$k" || die "$k is not set in ${file/#$HOME/\~}"
+    awk -v k="$k" '
+        {
+            p = index($0, "=")
+            if (p > 0) {
+                key = substr($0, 1, p - 1)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+                if (key == k) next
+            }
+            print
+        }' "$file" > "$file.new" && mv "$file.new" "$file"
+    say "$k is back to its default"
+    cmd_apply
+}
+
+cmd_diff() {
+    prepare
+    local name dest scope reload changed=0
+    while IFS=$'\t' read -r name dest scope reload; do
+        in_scope "$scope" || continue
+        if [[ ! -e $dest ]]; then
+            say "new: ${dest/#$HOME/\~}"; changed=1; continue
+        fi
+        cmp -s "$tmp/new/$name" "$dest" && continue
+        changed=1
+        head_ "${dest/#$HOME/\~}"
+        diff -u "$dest" "$tmp/new/$name" | tail -n +3 | sed 's/^/  /'
+    done < <(targets_tsv)
+    (( changed )) || say "everything is already as it should be"
+}
+
+cmd_apply() {
+    local force=0
+    [[ ${1:-} == --force ]] && force=1
+    prepare
+
+    local name dest scope reload changed=() reloads=() refused=()
+    while IFS=$'\t' read -r name dest scope reload; do
+        in_scope "$scope" || continue
+        if [[ -e $dest ]] && cmp -s "$tmp/new/$name" "$dest"; then continue; fi
+        if [[ -e $dest ]] && ! ours "$dest" && ! cmp -s "$tmp/pristine/$name" "$dest" && (( ! force )); then
+            refused+=("${dest/#$HOME/\~}")
+            continue
+        fi
+        changed+=("$name	$dest	$reload")
+        [[ $reload == none ]] || reloads+=("$reload")
+    done < <(targets_tsv)
+
+    if (( ${#refused[@]} )); then
+        warn "these files were changed by hand, so they stay as they are:"
+        printf '      %s\n' "${refused[@]}" >&2
+        warn "overwrite them with: sevconf apply --force   (the old version is kept)"
+    fi
+    if (( ! ${#changed[@]} )); then
+        say "nothing to change"
+        return 0
+    fi
+
+    # keep what is there now, so undo can put it back
+    rm -rf "$GEN/prev"; mkdir -p "$GEN/prev" "$GEN/current"
+    : > "$GEN/prev.tsv"
+    local line stored
+    for line in "${changed[@]}"; do
+        IFS=$'\t' read -r name dest reload <<<"$line"
+        stored=${dest//\//_}
+        if [[ -e $dest ]]; then
+            cp -a "$dest" "$GEN/prev/$stored"
+            printf '%s\t%s\t1\n' "$dest" "$stored" >> "$GEN/prev.tsv"
+        else
+            printf '%s\t%s\t0\n' "$dest" "$stored" >> "$GEN/prev.tsv"
+        fi
+    done
+
+    # write
+    local new_manifest=$tmp/manifest
+    [[ -r $MANIFEST ]] && cp "$MANIFEST" "$new_manifest" || : > "$new_manifest"
+    for line in "${changed[@]}"; do
+        IFS=$'\t' read -r name dest reload <<<"$line"
+        mkdir -p "${dest%/*}"
+        install -m 644 "$tmp/new/$name" "$dest"
+        cp "$tmp/new/$name" "$GEN/current/$name"
+        awk -F'\t' -v d="$dest" '$1 != d' "$new_manifest" > "$new_manifest.x"
+        mv "$new_manifest.x" "$new_manifest"
+        printf '%s\t%s\n' "$dest" "$(sha "$dest")" >> "$new_manifest"
+        say "wrote ${dest/#$HOME/\~}"
+    done
+    mkdir -p "$STATE"; cp "$new_manifest" "$MANIFEST"
+
+    do_reloads "${reloads[@]:-}"
+    run_actions
+}
+
+do_reloads() {
+    local kinds=" $* " out
+    if [[ $kinds == *" sway "* && -n ${SWAYSOCK:-} ]]; then
+        if ! out=$(swaymsg reload 2>&1); then
+            warn "Sway refused the new settings, putting the old files back"
+            printf '      %s\n' "$out" >&2
+            cmd_undo --quiet
+            exit 1
+        fi
+        say "Sway reloaded"
+    fi
+    if [[ $kinds == *" mako "* ]] && command -v makoctl >/dev/null; then
+        makoctl reload 2>/dev/null && say "mako reloaded"
+    fi
+    if [[ $kinds == *" waybar "* ]]; then
+        pkill -USR2 -x waybar 2>/dev/null && say "the bar reloaded"
+    fi
+    if [[ $kinds == *" idle "* ]] && command -v sevidle >/dev/null; then
+        pkill -x swayidle 2>/dev/null
+        setsid -f sevidle >/dev/null 2>&1
+        say "idle times applied"
+    fi
+    if [[ $kinds == *" night "* ]] && command -v sevnight >/dev/null; then
+        sevnight restore >/dev/null 2>&1
+    fi
+    if [[ $kinds == *" logind "* ]]; then
+        say "the lid setting takes effect after the next start"
+    fi
+}
+
+# settings that are not a file but an action
+run_actions() {
+    (( system )) || return 0
+    (( EUID == 0 )) || return 0
+    local host tz
+    host=$(value_of system.hostname); tz=$(value_of system.timezone)
+    if [[ -n $host && $host != "$(hostnamectl --static 2>/dev/null)" ]]; then
+        hostnamectl set-hostname "$host" && say "hostname is now $host"
+    fi
+    if [[ -n $tz && $tz != "$(timedatectl show -p Timezone --value 2>/dev/null)" ]]; then
+        timedatectl set-timezone "$tz" && say "time zone is now $tz"
+    fi
+}
+
+cmd_undo() {
+    local quiet=${1:-}
+    [[ -r $GEN/prev.tsv ]] || die "there is nothing to undo"
+    local dest stored existed reloads=()
+    while IFS=$'\t' read -r dest stored existed; do
+        if [[ $existed == 1 ]]; then
+            install -m 644 "$GEN/prev/$stored" "$dest"
+            [[ $quiet == --quiet ]] || say "put back ${dest/#$HOME/\~}"
+        else
+            rm -f "$dest"
+            [[ $quiet == --quiet ]] || say "removed ${dest/#$HOME/\~}"
+        fi
+        if [[ -r $MANIFEST ]]; then
+            awk -F'\t' -v d="$dest" '$1 != d' "$MANIFEST" > "$MANIFEST.x"
+            mv "$MANIFEST.x" "$MANIFEST"
+        fi
+    done < "$GEN/prev.tsv"
+    rm -f "$GEN/prev.tsv"
+    do_reloads sway waybar mako idle night
+}
+
+cmd_export() {
+    tmp=$(mktemp -d); build_map 0 > "$tmp/map"
+    local k type def scope val
+    printf '# SeverianOS · effective settings · %s\n' "$(date +%F)"
+    while IFS=$'\t' read -r k type def scope; do
+        val=$(value_of "$k")
+        printf '%s = %s\n' "$k" "$(quote_for "$type" "$val")"
+    done < <(schema_tsv)
+}
+
+cmd_schema() {
+    head_ "every setting"
+    awk -F'|' '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        {
+            for (i = 1; i <= 5; i++) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $i) }
+            printf "  %-30s %-22s %-18s %s\n", $1, $2, substr($3, 1, 17), $5
+        }' "$SCHEMA"
+    echo
+}
+
+cmd_edit() {
+    local file=$USRFILE
+    (( system )) && file=$SYSFILE
+    mkdir -p "${file%/*}"
+    [[ -f $file ]] || printf '# SeverianOS settings. One dotted key per line.\n' > "$file"
+    "${EDITOR:-nano}" "$file"
+    cmd_apply
+}
+
+# the invariant: defaults must render exactly what the packages ship
+cmd_verify_defaults() {
+    prepare
+    local name dest scope reload rel skelfile bad=0
+    head_ "defaults against the shipped files"
+    while IFS=$'\t' read -r name dest scope reload; do
+        [[ $scope == user ]] || continue
+        rel=${dest#"$HOME"/}
+        skelfile=$SKEL/$rel
+        if [[ ! -e $skelfile ]]; then
+            printf '  %s%-42s%s %snot shipped (generated only)%s\n' "$b" "$rel" "$r" "$m" "$r"
+            continue
+        fi
+        if cmp -s "$tmp/pristine/$name" "$skelfile"; then
+            printf '  %s%-42s%s %sidentical%s\n' "$b" "$rel" "$r" "$f" "$r"
+        else
+            printf '  %s%-42s%s %sdiffers%s\n' "$b" "$rel" "$r" "$e" "$r"
+            diff -u "$skelfile" "$tmp/pristine/$name" | tail -n +3 | sed 's/^/      /'
+            bad=1
+        fi
+    done < <(targets_tsv)
+    echo
+    return $bad
+}
+
+# ── main ──────────────────────────────────────
+args=()
+while (( $# )); do
+    case $1 in
+        --system) system=1 ;;
+        *) args+=("$1") ;;
+    esac
+    shift
+done
+if (( ${#args[@]} )); then set -- "${args[@]}"; else set --; fi
+
+case ${1:-list} in
+    list)            shift || true; cmd_list "${1:-}" ;;
+    get)             shift; cmd_get "$@" ;;
+    set)             shift; cmd_set "$@" ;;
+    unset)           shift; cmd_unset "$@" ;;
+    diff)            cmd_diff ;;
+    apply)           shift || true; cmd_apply "${1:-}" ;;
+    undo)            cmd_undo ;;
+    export)          cmd_export ;;
+    schema)          cmd_schema ;;
+    edit)            cmd_edit ;;
+    verify-defaults) cmd_verify_defaults ;;
+    -h|--help|help)  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *)               die "unknown command: $1   (sevconf --help)" ;;
+esac

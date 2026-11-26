@@ -38,6 +38,31 @@ sevconfig diff waybar     # how
 sevconfig reset waybar    # take the new default (yours is backed up)
 ```
 
+## Settings
+
+Every setting lives in one of two files, and everything else is generated
+from them:
+
+```sh
+sevconf list                 # what is set, and where it comes from
+sevconf set look.accent 7f9a65
+sevconf set look.font_size 11
+sudo sevconf set --system power.lid lock
+sevconf diff                 # what applying would change
+sevconf undo                 # one step back
+```
+
+Your settings go to `~/.config/severian/user.toml`, the machine's to
+`/etc/severian/system.toml`. From those, SeverianOS writes the Sway drop-in
+`50-severian.conf`, the Waybar, foot, fuzzel, mako, swaylock, swaynag and GTK
+configs, the idle times and the night light. Generated files say so in their
+first line.
+
+Two rules make this safe: a file you changed by hand is never overwritten
+(`sevconf apply` says which, `--force` overrides), and if Sway refuses a
+change the previous files come back by themselves. `sevsettings` (Super+Comma)
+is the same thing with menus.
+
 ## Make it yours
 
 Your own Sway settings belong in **`~/.config/sway/config.d/*.conf`**. Those
