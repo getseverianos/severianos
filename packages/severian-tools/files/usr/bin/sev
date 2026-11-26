@@ -140,6 +140,13 @@ doctor() {
         warn "mirrors are not refreshed automatically"; hint "sudo systemctl enable --now reflector.timer"
     fi
 
+    if [[ $(xdg-user-dir PICTURES 2>/dev/null) == "$HOME/Pictures" ]]; then
+        good "home folders are English"
+    else
+        warn "home folders are not the English ones ($(xdg-user-dir PICTURES 2>/dev/null | sed "s|^$HOME|~|"))"
+        hint "sevdirs shows them, sevdirs fix writes the English names"
+    fi
+
     if [[ -e /usr/lib/modules/$(uname -r) ]]; then good "running the installed kernel"
     else warn "a new kernel is installed"; hint "reboot when convenient"; fi
     echo
@@ -233,6 +240,7 @@ usage: sev [command]
   clean      free disk space (package cache, old logs, unused packages)
   fix        repair common problems (stale pacman lock)
   mem        where the memory goes
+  dirs       check the home folders (sevdirs)
   bench      measure ram, disk and boot time (sevbench)
   rollback   undo the last update (btrfs installs)
   welcome    first-start setup and hardware check
@@ -252,6 +260,7 @@ case ${1:-} in
     clean)     clean ;;
     fix)       fix ;;
     mem)       mem ;;
+    dirs)      shift; run_or_say sevdirs "$@" ;;
     bench)     shift; run_or_say sevbench "$@" ;;
     rollback)  shift; rollback "$@" ;;
     welcome)   exec sevwelcome --setup ;;

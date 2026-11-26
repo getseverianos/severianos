@@ -1,0 +1,2 @@
+# Paths another package also owns that we accept anyway.
+# Keep this empty: see the 0.3.1 lesson in docs/.

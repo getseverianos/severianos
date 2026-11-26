@@ -95,6 +95,13 @@ The form is `## section | what it does`; the sections are start, windows,
 layout, workspaces, screen and more. Without a marker the binding is listed
 under "your own bindings".
 
+- **Media keys:** a keyboard with play/next/previous keys works as it should.
+  Without them: **Super+Alt+Space** play/pause, **Super+Alt+Right** next,
+  **Super+Alt+Left** previous. Volume and brightness are on the usual keys.
+- **Home folders:** Documents, Downloads, Music, Pictures and Videos, in
+  English, whatever language you install in. `sevdirs` shows them; if an
+  older install still has translated names, `sevdirs fix` writes the English
+  ones and `sevdirs fix --move` moves what is in the old ones.
 - **Keyboard layout:** Super+F2 (remembered). For the console and the login
   screen: `sudo localectl set-keymap de-latin1`.
 - **Wallpaper:** `output * bg /path/to/image.png fill` in a `config.d` file.

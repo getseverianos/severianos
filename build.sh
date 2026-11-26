@@ -4,8 +4,9 @@
 #   ./build.sh check      verify that every dependency exists in the Arch repos
 #   ./build.sh packages   build all packages in packages/ (as your user)
 #   ./build.sh repo       create the local [severian] repo from the built packages
+#   ./build.sh verify     check the built packages before they go out
 #   ./build.sh iso        build the ISO with that repo (asks for sudo)
-#   ./build.sh all        check + packages + repo + iso
+#   ./build.sh all        check + packages + repo + verify + iso
 #   ./build.sh publish    upload the signed repo to GitHub (PUBLISH_REPO, PUBLISH_TAG)
 #   ./build.sh release    tag v$(cat VERSION) and create a DRAFT GitHub release with the ISO
 #   ./build.sh clean      remove build/
@@ -95,6 +96,96 @@ repo() {
     ok "$(find "$REPO" -name '*.pkg.tar.zst' | wc -l) packages in $REPO"
 }
 
+# Catch the 0.3.1 class of bug before anything is published: a file we ship
+# that another package already owns breaks every "pacman -Syu" with
+# "conflicting files". Shipping is also the only moment we can still fix it.
+#   ./build.sh verify
+_owners() {   # paths on stdin -> "package<TAB>path" for each path a repo package owns
+    local -a paths
+    mapfile -t paths
+    (( ${#paths[@]} )) || return 0
+    pacman -F -- "${paths[@]}" 2>/dev/null | awk '
+        /^[^[:space:]]/ {
+            pkg = $1; sub(/^[^\/]*\//, "", pkg)       # "extra/reflector 2024-1" -> reflector
+            if (NF >= 3) print pkg "\t" $3            # one-line form
+            next
+        }
+        NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print pkg "\t" $0 }
+    '
+}
+
+verify() {
+    step "Verifying the built packages"
+    [[ -d $REPO ]] || die "no packages built yet – ./build.sh packages"
+    command -v bsdtar >/dev/null || die "bsdtar missing – sudo pacman -S libarchive"
+    local -a pkgs
+    mapfile -t pkgs < <(find "$REPO" -maxdepth 1 -name '*.pkg.tar.zst' | sort)
+    (( ${#pkgs[@]} )) || die "no packages in $REPO"
+
+    local work=$BUILD/verify p name f
+    rm -rf "$work"; mkdir -p "$work"
+
+    # 1. every shipped script must at least parse
+    local bad=0
+    for f in "$ROOT"/packages/*/*.install; do
+        [[ -e $f ]] || continue
+        bash -n "$f" || { printf '  %s✗ syntax error: %s%s\n' "$E" "${f#$ROOT/}" "$R"; bad=1; }
+    done
+    while read -r f; do
+        head -c 100 "$f" | grep -q 'bash' || continue
+        bash -n "$f" || { printf '  %s✗ syntax error: %s%s\n' "$E" "${f#$ROOT/}" "$R"; bad=1; }
+    done < <(find "$ROOT"/packages/*/files/usr/bin -type f 2>/dev/null)
+    (( bad == 0 )) || die "fix the scripts above"
+    ok "every shipped script parses"
+
+    # 2. collect what we ship: "our-package<TAB>path"
+    for p in "${pkgs[@]}"; do
+        name=${p##*/}; name=${name%-*-*-*.pkg.tar.zst}
+        bsdtar -tf "$p" | grep -v '/$' | grep -v '^\.' | sed "s|^|$name\t|"
+    done > "$work/ours"
+    ok "$(wc -l < "$work/ours") files in ${#pkgs[@]} packages"
+
+    # 3. no path in two of our own packages (pacman would refuse that too)
+    awk -F'\t' '{ who[$2] = who[$2] " " $1; n[$2]++ }
+                END { for (f in n) if (n[f] > 1) printf "  %s is in:%s\n", f, who[f] }' \
+        "$work/ours" | sort > "$work/dup"
+    if [[ -s $work/dup ]]; then
+        cat "$work/dup" >&2
+        die "two severian packages ship the same file"
+    fi
+    ok "no file is in two severian packages"
+
+    # 4. no path that belongs to a package in the Arch repos
+    if ! compgen -G '/var/lib/pacman/sync/*.files' >/dev/null ||
+       [[ -z $(find /var/lib/pacman/sync -maxdepth 1 -name '*.files' -mtime -2 2>/dev/null) ]]; then
+        note "refreshing the pacman file database (sudo pacman -Fy)"
+        sudo pacman -Fy >/dev/null || die "pacman -Fy failed"
+    fi
+    # prove the check works before a clean result is allowed to mean anything
+    [[ -n $(printf 'usr/bin/bash\n' | _owners) ]] ||
+        die "the ownership check itself is broken: pacman -F found no owner for usr/bin/bash"
+    cut -f2 "$work/ours" | _owners | awk -F'\t' '$1 !~ /^severian-/' | sort -u > "$work/all-foreign"
+    # packages/.verify-allow holds paths we knowingly share (one per line) – keep it empty
+    local allow=$ROOT/packages/.verify-allow
+    if [[ -s $allow ]]; then
+        grep -v -x -F -f <(grep -v '^\s*#' "$allow" | grep -v '^\s*$') \
+            <(cut -f2 "$work/all-foreign") > "$work/keep" || true
+        awk -F'\t' 'NR==FNR { k[$0]; next } $2 in k' "$work/keep" "$work/all-foreign" > "$work/foreign"
+        note "$(( $(wc -l < "$work/all-foreign") - $(wc -l < "$work/foreign") )) finding(s) allowed by packages/.verify-allow"
+    else
+        mv "$work/all-foreign" "$work/foreign"
+    fi
+    if [[ -s $work/foreign ]]; then
+        while IFS=$'\t' read -r owner path; do
+            name=$(awk -F'\t' -v p="$path" '$2 == p { print $1; exit }' "$work/ours")
+            printf '  %s✗ %s%s\n    ours: %s   belongs to: %s\n' "$E" "$path" "$R" "${name:-?}" "$owner"
+        done < "$work/foreign"
+        note "use our own path (/usr/share/severian/…) and a drop-in instead – see 0.3.1"
+        die "$(wc -l < "$work/foreign") file(s) already belong to another package"
+    fi
+    ok "no file belongs to another package"
+}
+
 iso() {
     step "Preparing the ISO profile"
     [[ -f $REPO/severian.db.tar.zst ]] || die "no repo yet – ./build.sh repo"
@@ -136,6 +227,7 @@ iso() {
 }
 
 publish() {
+    verify
     step "Publishing the repo to github.com/$PUBLISH_REPO (release $PUBLISH_TAG)"
     command -v gh >/dev/null || die "github-cli missing – sudo pacman -S github-cli"
     [[ -n ${PUBLISH_REPO:-} && -n ${PUBLISH_TAG:-} ]] || die "set PUBLISH_REPO and PUBLISH_TAG in config.sh"
@@ -262,8 +354,9 @@ case ${1:-all} in
     check)    check ;;
     packages) packages ;;
     repo)     repo ;;
+    verify)   verify ;;
     iso)      iso ;;
-    all)      check; packages; repo; iso ;;
+    all)      check; packages; repo; verify; iso ;;
     publish)  publish ;;
     clean)    sudo rm -rf "$BUILD"; ok "build/ removed" ;;
     release)  release ;;

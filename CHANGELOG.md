@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased (0.7)
+
+- Media keys: play/pause, next and previous track through `sevosd media`,
+  which shows what is playing. A keyboard with media keys sends XF86Audio*;
+  everything else has Super+Alt+Space, Super+Alt+Right and Super+Alt+Left,
+  because a ThinkPad T440p has no media keys at all. The volume and
+  brightness keys are listed in `sevhelp` now — they always worked, they
+  were just missing their marker line
+- The home folders stay English: `/etc/skel/.config/user-dirs.dirs` sets
+  them, so xdg-user-dirs no longer translates them at first login. A German
+  install used to get ~/Bilder while sevshot wrote to ~/Pictures — two folder
+  trees for the same thing. Desktop, Templates and Public point at $HOME:
+  Sway has no desktop and no template menu
+- `sevdirs` repairs a system that already has translated folders: `sevdirs`
+  shows them, `sevdirs fix` writes the English names and leaves the old
+  folders alone, `sevdirs fix --move` moves what is in them. `sev doctor`
+  warns when the folders are not English
+- `./build.sh verify` checks the built packages before they go anywhere, and
+  `publish` now runs it by itself. It refuses a package that ships a file
+  another package owns — the mistake that made every `pacman -Syu` fail in
+  0.3.1 — a file that is in two severian packages, and a script that does not
+  parse. The ownership check tests itself against a known file first, so a
+  clean result means the check ran rather than silently found nothing
+
 ## Unreleased (0.6)
 
 - One place for all settings: `/etc/severian/system.toml` for the machine,

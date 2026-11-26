@@ -176,12 +176,33 @@ mode "resize" {
 }
 
 # ── Media, brightness, screenshots ────────────
+## media | volume up
 bindsym --locked XF86AudioRaiseVolume exec sevosd volume up
+## media | volume down
 bindsym --locked XF86AudioLowerVolume exec sevosd volume down
+## media | mute
 bindsym --locked XF86AudioMute exec sevosd volume mute
+## media | mute the microphone
 bindsym --locked XF86AudioMicMute exec sevosd mic mute
+## media | brighter
 bindsym --locked XF86MonBrightnessUp exec sevosd brightness up
+## media | darker
 bindsym --locked XF86MonBrightnessDown exec sevosd brightness down
+
+# Playback. The XF86 keys are what a keyboard with media keys sends; the
+# Super+Alt row is for everything else (a T440p has no media keys at all).
+## media | play / pause | play · super + alt + space
+bindsym --locked XF86AudioPlay exec sevosd media play
+bindsym --locked XF86AudioPause exec sevosd media play
+bindsym --locked $mod+Mod1+space exec sevosd media play
+## media | next track
+bindsym --locked XF86AudioNext exec sevosd media next
+bindsym --locked $mod+Mod1+Right exec sevosd media next
+## media | previous track
+bindsym --locked XF86AudioPrev exec sevosd media prev
+bindsym --locked $mod+Mod1+Left exec sevosd media prev
+## media | stop playback
+bindsym --locked XF86AudioStop exec sevosd media stop
 
 ## screen | region → clipboard
 bindsym Print exec grim -g "$(slurp -b 12121499 -c b5523bff -w 2)" - | wl-copy

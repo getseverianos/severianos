@@ -58,6 +58,30 @@ PKGBUILD. Installed systems only update when the version goes up.
 Rule of thumb: anything an installed system needs goes into a **package**.
 `iso/airootfs/` is only for the live medium (live user, autologin, keyboard).
 
+## Before publishing
+
+```sh
+./build.sh verify
+```
+
+`publish` runs this by itself; run it on its own while you are still working.
+It refuses to let three mistakes out of the door:
+
+- **a file another package owns.** This is what broke 0.3.1: we shipped
+  `/etc/xdg/reflector/reflector.conf`, which belongs to `reflector`, and every
+  `pacman -Syu` stopped with "conflicting files". Put our settings in
+  `/usr/share/severian/` and point the service at them with a drop-in in
+  `/usr/lib/systemd/system/<unit>.d/`.
+- **a file in two severian packages.** pacman refuses that too.
+- **a script that does not parse** (`bash -n` on every `*.install` and
+  everything in `files/usr/bin/`).
+
+The ownership check needs the pacman file database and refreshes it with
+`sudo pacman -Fy` when it is older than two days. It tests itself against a
+known file first, so a clean result means the check really ran. If a shared
+path is ever deliberate, list it in `packages/.verify-allow` — and write down
+why.
+
 ## Testing
 
 ```sh

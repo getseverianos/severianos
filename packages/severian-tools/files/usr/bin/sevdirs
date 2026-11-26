@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# sevdirs — keep the home folders English, whatever language the install used
+#
+#   sevdirs              show what the folders are now
+#   sevdirs fix          write English names and create the folders
+#   sevdirs fix --move   the same, and move what is in the old folders
+#
+# Why: the system runs in English, but xdg-user-dirs translates the folder
+# names at first login from the language the installer ran in. A German
+# install gets ~/Bilder while sevshot writes to ~/Pictures – two trees for
+# the same thing. This writes ~/.config/user-dirs.dirs ourselves.
+set -uo pipefail
+
+E=$'\e[38;2;181;82;59m'; G=$'\e[38;2;127;154;101m'; M=$'\e[38;2;111;106;98m'; R=$'\e[0m'
+good() { printf '  %s✓%s %s\n' "$G" "$R" "$*"; }
+warn() { printf '  %s!%s %s\n' "$E" "$R" "$*"; }
+hint() { printf '    %s%s%s\n' "$M" "$*" "$R"; }
+
+CONF=${XDG_CONFIG_HOME:-$HOME/.config}/user-dirs.dirs
+LOCALE=${XDG_CONFIG_HOME:-$HOME/.config}/user-dirs.locale
+
+# key -> where it should point, relative to $HOME ("." means $HOME itself)
+KEYS=(XDG_DESKTOP_DIR XDG_TEMPLATES_DIR XDG_PUBLICSHARE_DIR
+      XDG_DOCUMENTS_DIR XDG_DOWNLOAD_DIR XDG_MUSIC_DIR XDG_PICTURES_DIR XDG_VIDEOS_DIR)
+want() {
+    case $1 in
+        XDG_DESKTOP_DIR|XDG_TEMPLATES_DIR|XDG_PUBLICSHARE_DIR) printf '%s' "$HOME" ;;
+        XDG_DOCUMENTS_DIR)   printf '%s/Documents' "$HOME" ;;
+        XDG_DOWNLOAD_DIR)    printf '%s/Downloads' "$HOME" ;;
+        XDG_MUSIC_DIR)       printf '%s/Music' "$HOME" ;;
+        XDG_PICTURES_DIR)    printf '%s/Pictures' "$HOME" ;;
+        XDG_VIDEOS_DIR)      printf '%s/Videos' "$HOME" ;;
+    esac
+}
+
+# what the key points at right now (xdg-user-dir resolves the file for us)
+now() {
+    local v
+    v=$(xdg-user-dir "$(k2name "$1")" 2>/dev/null)
+    [[ -n $v ]] && { printf '%s' "$v"; return; }
+    printf '%s' "$HOME"
+}
+k2name() { local n=${1#XDG_}; printf '%s' "${n%_DIR}"; }
+
+short() { printf '%s' "${1/#$HOME/\~}"; }
+
+show() {
+    printf '\n  %shome folders%s\n\n' "$M" "$R"
+    local k is should
+    for k in "${KEYS[@]}"; do
+        is=$(now "$k"); should=$(want "$k")
+        if [[ $is == "$should" ]]; then
+            printf '  %s✓%s %-14s %s\n' "$G" "$R" "$(k2name "$k")" "$(short "$is")"
+        else
+            printf '  %s!%s %-14s %s   %s(should be %s)%s\n' "$E" "$R" "$(k2name "$k")" \
+                "$(short "$is")" "$M" "$(short "$should")" "$R"
+        fi
+    done
+    echo
+    if ! english; then
+        warn "these are not the English names"
+        hint "sevdirs fix          write the English names, leave the old folders alone"
+        hint "sevdirs fix --move   and move what is in them"
+    else
+        good "all English"
+    fi
+    echo
+}
+
+english() {
+    local k
+    for k in "${KEYS[@]}"; do [[ $(now "$k") == "$(want "$k")" ]] || return 1; done
+    [[ -f $CONF ]] || return 1
+    return 0
+}
+
+fix() {
+    local move=0 k is should left=()
+    [[ ${1:-} == --move ]] && move=1
+
+    # remember where things point before we overwrite the file
+    local -A was
+    for k in "${KEYS[@]}"; do was[$k]=$(now "$k"); done
+
+    mkdir -p "$(dirname "$CONF")"
+    [[ -f $CONF ]] && cp -f "$CONF" "$CONF.sevbak"
+    {
+        echo "# written by sevdirs – the system is English, so these are too"
+        echo "# change them here and run: xdg-user-dirs-update"
+        for k in "${KEYS[@]}"; do
+            printf '%s="%s"\n' "$k" "$(want "$k" | sed "s|^$HOME|\$HOME|")"
+        done
+    } > "$CONF"
+    printf 'en_US\n' > "$LOCALE"
+    good "wrote $(short "$CONF")"
+
+    for k in "${KEYS[@]}"; do
+        should=$(want "$k")
+        [[ $should == "$HOME" ]] && continue
+        mkdir -p "$should" && good "$(short "$should")"
+    done
+
+    for k in "${KEYS[@]}"; do
+        is=${was[$k]}; should=$(want "$k")
+        [[ $is == "$should" || $is == "$HOME" || ! -d $is ]] && continue
+        if (( move )); then
+            if [[ -n $(find "$is" -mindepth 1 -maxdepth 1 -print -quit) ]]; then
+                ( shopt -s dotglob nullglob; mv -n "$is"/* "$should"/ )
+                good "moved $(short "$is") → $(short "$should")"
+            fi
+            rmdir "$is" 2>/dev/null && good "removed the empty $(short "$is")"
+        else
+            left+=("$is")
+        fi
+    done
+
+    if ((${#left[@]})); then
+        echo
+        warn "the old folders are still there, untouched:"
+        for is in "${left[@]}"; do hint "$(short "$is")"; done
+        hint "sevdirs fix --move moves what is in them"
+    fi
+    echo
+    good "log out and in again so every program sees it"
+    echo
+}
+
+case ${1:-show} in
+    show|'')  show ;;
+    fix)      fix "${2:-}" ;;
+    -h|--help|help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *)        printf 'usage: sevdirs [show|fix [--move]]\n' >&2; exit 1 ;;
+esac

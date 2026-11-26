@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
-# sevosd — change volume or brightness and show it as a small bar (via mako)
+# sevosd — change volume, brightness or playback and show it (via mako)
 #   sevosd volume up|down|mute     sevosd mic mute     sevosd brightness up|down
+#   sevosd media play|next|prev|stop
 
 show() {  # $1 title, $2 value 0-100
     notify-send -a sevosd -t 1200 \
         -h string:x-canonical-private-synchronous:sevosd -h "int:value:$2" "$1" 2>/dev/null
+}
+
+text() {  # $1 title, $2 body – for things that have no bar
+    notify-send -a sevosd -t 1600 \
+        -h string:x-canonical-private-synchronous:sevosd "$1" "${2:-}" 2>/dev/null
+}
+
+# What is playing, as "artist — title". Empty when nothing is playing.
+track() {
+    local t
+    t=$(playerctl metadata --format '{{ artist }} — {{ title }}' 2>/dev/null) || return 0
+    t=${t# — }; t=${t% — }
+    printf '%s' "$t"
 }
 
 case ${1:-}:${2:-} in
@@ -14,7 +28,24 @@ case ${1:-}:${2:-} in
     mic:mute)    wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
     brightness:up)   brightnessctl -q set 5%+ ;;
     brightness:down) brightnessctl -q set 5%- ;;
-    *) echo "usage: sevosd volume up|down|mute | mic mute | brightness up|down" >&2; exit 1 ;;
+    media:*)
+        command -v playerctl >/dev/null || { text "no player control" "install playerctl"; exit 1; }
+        case $2 in
+            play|pause|play-pause|toggle) playerctl play-pause 2>/dev/null ;;
+            next)                         playerctl next 2>/dev/null ;;
+            prev|previous)                playerctl previous 2>/dev/null ;;
+            stop)                         playerctl stop 2>/dev/null ;;
+            *) echo "usage: sevosd media play|next|prev|stop" >&2; exit 1 ;;
+        esac
+        # the player needs a moment before it reports the new state
+        sleep 0.25
+        case $(playerctl status 2>/dev/null) in
+            Playing) text "playing" "$(track)" ;;
+            Paused)  text "paused"  "$(track)" ;;
+            *)       text "stopped" ;;
+        esac
+        exit 0 ;;
+    *) echo "usage: sevosd volume up|down|mute | mic mute | brightness up|down | media play|next|prev|stop" >&2; exit 1 ;;
 esac
 
 case $1 in

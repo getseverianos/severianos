@@ -15,7 +15,7 @@ m=$'\e[38;2;111;106;98m'; b=$'\e[38;2;201;166;107m'; r=$'\e[0m'
 SEP=$'\x1f'
 DOT=' · '
 
-order=(start windows layout workspaces screen more)
+order=(start windows layout workspaces screen media more)
 
 cfg=${XDG_CONFIG_HOME:-$HOME/.config}
 files=()
@@ -53,6 +53,17 @@ pretty() {
             bracketleft)        part='[' ;;
             bracketright)       part=']' ;;
             backslash)          part='\' ;;
+            XF86AudioRaiseVolume) part='vol +' ;;
+            XF86AudioLowerVolume) part='vol -' ;;
+            XF86AudioMute)      part=mute ;;
+            XF86AudioMicMute)   part=micmute ;;
+            XF86MonBrightnessUp)   part='bright +' ;;
+            XF86MonBrightnessDown) part='bright -' ;;
+            XF86AudioPlay)      part=play ;;
+            XF86AudioPause)     part=pause ;;
+            XF86AudioNext)      part=next ;;
+            XF86AudioPrev)      part=prev ;;
+            XF86AudioStop)      part=stop ;;
             XF86*)              part=${part#XF86}; part=${part,,} ;;
             Tab|Print|Up|Down|Left|Right|Home|End|Insert|Delete|Menu|BackSpace)
                                 part=${part,,} ;;

@@ -1,0 +1,16 @@
+# SeverianOS: the system is English, so these folders are English too.
+# Without this file xdg-user-dirs translates them at first login, and a
+# German install ends up with Bilder/Dokumente while our tools write to
+# Pictures/Documents – two folder trees for the same thing.
+#
+# Change them with: sevdirs
+# Desktop, Templates and Public point at $HOME: Sway has no desktop and
+# no template menu, so there is nothing to put in them.
+XDG_DESKTOP_DIR="$HOME"
+XDG_TEMPLATES_DIR="$HOME"
+XDG_PUBLICSHARE_DIR="$HOME"
+XDG_DOCUMENTS_DIR="$HOME/Documents"
+XDG_DOWNLOAD_DIR="$HOME/Downloads"
+XDG_MUSIC_DIR="$HOME/Music"
+XDG_PICTURES_DIR="$HOME/Pictures"
+XDG_VIDEOS_DIR="$HOME/Videos"
