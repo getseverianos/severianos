@@ -104,7 +104,8 @@ _owners() {   # paths on stdin -> "package<TAB>path" for each path a repo packag
     local -a paths
     mapfile -t paths
     (( ${#paths[@]} )) || return 0
-    pacman -F -- "${paths[@]}" 2>/dev/null | awk '
+    # pacman -F exits nonzero for every path nobody owns, which is most of ours
+    { pacman -F -- "${paths[@]}" 2>/dev/null || true; } | awk '
         /^[^[:space:]]/ {
             pkg = $1; sub(/^[^\/]*\//, "", pkg)       # "extra/reflector 2024-1" -> reflector
             if (NF >= 3) print pkg "\t" $3            # one-line form
@@ -141,7 +142,9 @@ verify() {
     # 2. collect what we ship: "our-package<TAB>path"
     for p in "${pkgs[@]}"; do
         name=${p##*/}; name=${name%-*-*-*.pkg.tar.zst}
-        bsdtar -tf "$p" | grep -v '/$' | grep -v '^\.' | sed "s|^|$name\t|"
+        # awk, not grep: severian-desktop is a meta package with no files at all,
+        # and "grep found nothing" plus pipefail would end the script right here
+        bsdtar -tf "$p" | awk -v n="$name" '!/\/$/ && !/^\./ { print n "\t" $0 }'
     done > "$work/ours"
     ok "$(wc -l < "$work/ours") files in ${#pkgs[@]} packages"
 
