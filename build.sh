@@ -106,13 +106,40 @@ _owners() {   # paths on stdin -> "package<TAB>path" for each path a repo packag
     (( ${#paths[@]} )) || return 0
     # pacman -F exits nonzero for every path nobody owns, which is most of ours
     { pacman -F -- "${paths[@]}" 2>/dev/null || true; } | awk '
-        /^[^[:space:]]/ {
-            pkg = $1; sub(/^[^\/]*\//, "", pkg)       # "extra/reflector 2024-1" -> reflector
-            if (NF >= 3) print pkg "\t" $3            # one-line form
-            next
+        {
+            # What pacman -F really prints for an exact path:
+            #   usr/bin/sevbattery is owned by severian/severian-tools 0.1.0-16
+            if (match($0, / is owned by /)) {
+                path = substr($0, 1, RSTART - 1)
+                rest = substr($0, RSTART + RLENGTH)
+                split(rest, a, /[[:space:]]+/)
+                pkg = a[1]; sub(/^[^\/]*\//, "", pkg)
+                sub(/^\//, "", path)
+                print pkg "\t" path
+                next
+            }
+            # "repo/pkg 1.2-3", on its own or followed by indented paths
+            if (/^[^[:space:]]/) {
+                pkg = $1; sub(/^[^\/]*\//, "", pkg)
+                if (NF >= 3) { p = $3; sub(/^\//, "", p); print pkg "\t" p }
+                next
+            }
+            if (NF) {
+                gsub(/^[[:space:]]+|[[:space:]]+$/, ""); sub(/^\//, "")
+                print pkg "\t" $0
+            }
         }
-        NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print pkg "\t" $0 }
     '
+}
+
+# A check that finds nothing has to prove it ran at all. Asking only "was the
+# output non-empty" is not enough: a misread line is also non-empty, which is
+# exactly how 100 of our own files once came back as foreign.
+_owners_selftest() {
+    local got
+    got=$(printf 'usr/bin/bash\n' | _owners)
+    [[ $got == $'bash\tusr/bin/bash' ]] || die \
+        "the ownership check cannot read pacman -F: expected 'bash<TAB>usr/bin/bash', got '${got:-nothing}'"
 }
 
 verify() {
@@ -165,8 +192,7 @@ verify() {
         sudo pacman -Fy >/dev/null || die "pacman -Fy failed"
     fi
     # prove the check works before a clean result is allowed to mean anything
-    [[ -n $(printf 'usr/bin/bash\n' | _owners) ]] ||
-        die "the ownership check itself is broken: pacman -F found no owner for usr/bin/bash"
+    _owners_selftest
     cut -f2 "$work/ours" | _owners | awk -F'\t' '$1 !~ /^severian-/' | sort -u > "$work/all-foreign"
     # packages/.verify-allow holds paths we knowingly share (one per line) – keep it empty
     local allow=$ROOT/packages/.verify-allow

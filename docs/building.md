@@ -78,7 +78,11 @@ It refuses to let three mistakes out of the door:
 
 The ownership check needs the pacman file database and refreshes it with
 `sudo pacman -Fy` when it is older than two days. It tests itself against a
-known file first, so a clean result means the check really ran. If a shared
+known file first — and on the exact answer (`bash` owns `usr/bin/bash`), not
+on "did something come back". The loose version of that test once passed
+while the parser was misreading every line, which reported all 100 of our own
+files as foreign. A self-test that only asks whether output exists tests
+nothing. If a shared
 path is ever deliberate, list it in `packages/.verify-allow` — and write down
 why.
 
